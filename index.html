@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4A5FC4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Diário de Viatura</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚙</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F2F4F6;--surface:#FFFFFF;--ink:#1F2428;--muted:#5C6671;--line:#D7DCE1;
+  --hydra:#4A5FC4;--hydra-ink:#FFFFFF;--hydra-soft:#E7EAF8;
+  --ok:#2B7550;--ok-soft:#E1F0E7;--warn:#8F5C0E;--warn-soft:#FBEFD6;--bad:#A8372A;--bad-soft:#F7E2DE;
+  --tile:#262B30;--tile-ink:#F2F4F6;
+  --f:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --fc:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#131619;--surface:#1B1F23;--ink:#E5E8EB;--muted:#9AA3AD;--line:#2D3339;
+  --hydra:#8E9EF2;--hydra-ink:#131619;--hydra-soft:#242A45;
+  --ok:#72C39A;--ok-soft:#1B3027;--warn:#E2B35C;--warn-soft:#382D17;--bad:#EE8B7B;--bad-soft:#3B221F;
+  --tile:#2C3238;--tile-ink:#FFFFFF;
+}}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--paper)}
+body{margin:0;font-family:var(--f);font-size:16px;line-height:1.45;color:var(--ink);background:var(--paper)}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--fc);font-weight:600;line-height:1.15;margin:0}
+h2{font-size:1.45rem;margin:0 0 .6rem}
+h3{font-size:1.15rem}
+
+/* Cabeçalho */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:14px;max-width:1180px;margin:0 auto;padding:10px 16px}
+.plate{display:inline-flex;align-items:stretch;border:2px solid #1B1F23;border-radius:6px;background:#fff;color:#16191C;overflow:hidden;flex:none}
+.plate .eu{background:#1F3FA8;color:#fff;font:600 .7rem/1 var(--fc);padding:3px 5px;display:flex;align-items:flex-end}
+.plate .n{font:700 1.25rem/1.3 var(--fc);letter-spacing:.05em;padding:1px 10px}
+.veh{min-width:0}
+.veh b{display:block;font:600 1.15rem/1.1 var(--fc)}
+.veh span{font-size:.85rem;color:var(--muted)}
+.sync{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);white-space:nowrap}
+.sync i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.sync.on i{background:var(--ok)}.sync.err i{background:var(--bad)}.sync.wait i{background:var(--warn)}
+.tabs{display:flex;gap:2px;overflow-x:auto;max-width:1180px;margin:0 auto;padding:0 10px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:none;padding:10px 12px;font-weight:500;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer}
+.tabs button[aria-current=page]{color:var(--ink);border-bottom-color:var(--hydra)}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+section{margin-bottom:26px}
+
+/* Botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:500;cursor:pointer;min-height:42px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--hydra);border-color:var(--hydra);color:var(--hydra-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--bad);border-color:transparent;background:none}
+.btn.big{font-size:1.1rem;padding:12px 20px;min-height:52px}
+.btn.sm{min-height:34px;padding:5px 10px;font-size:.9rem}
+:focus-visible{outline:3px solid var(--hydra);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+.head h2{margin:0}
+
+/* Início */
+.hero{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.lbl{margin:0 0 8px;color:var(--muted);font-size:.9rem}
+.odo{display:flex;gap:5px;align-items:flex-end}
+.odo span{display:block;background:var(--tile);color:var(--tile-ink);font:600 clamp(2.5rem,10vw,4.2rem)/1.08 var(--fc);min-width:.78em;text-align:center;border-radius:7px;padding:2px 4px;font-variant-numeric:tabular-nums}
+.odo span:last-of-type{background:var(--hydra);color:var(--hydra-ink)}
+.odo em{font:500 1.3rem var(--fc);font-style:normal;color:var(--muted);margin-left:6px}
+.estado{margin:14px 0 0;max-width:62ch}
+.hero-act{display:flex;flex-direction:column;gap:8px;min-width:220px}
+.alerts{display:grid;gap:8px}
+.al{padding:10px 14px;border-radius:9px;border-left:4px solid}
+.al.warn{background:var(--warn-soft);border-color:var(--warn)}
+.al.bad{background:var(--bad-soft);border-color:var(--bad)}
+.al.info{background:var(--hydra-soft);border-color:var(--hydra)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat{padding:14px 16px;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0;padding-left:0}
+.stat b{display:block;font:600 1.9rem/1.1 var(--fc);font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:.88rem}
+.meter{height:6px;background:var(--line);border-radius:3px;margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--hydra)}
+.meter i.warn{background:var(--warn)}.meter i.bad{background:var(--bad)}
+
+/* Tabelas */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:.85rem;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr[data-id]{cursor:pointer}
+tbody tr[data-id]:hover{background:var(--hydra-soft)}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nw{white-space:nowrap}
+.sub{display:block;color:var(--muted);font-size:.84rem}
+tfoot td{font-weight:600;border-top:2px solid var(--line);border-bottom:0}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.b{display:inline-block;padding:1px 8px;border-radius:20px;font-size:.8rem;font-weight:500;white-space:nowrap}
+.b.ok{background:var(--ok-soft);color:var(--ok)}.b.warn{background:var(--warn-soft);color:var(--warn)}
+.b.bad{background:var(--bad-soft);color:var(--bad)}.b.mut{background:var(--paper);color:var(--muted)}
+.bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.bar-cell i{display:block;height:8px;background:var(--hydra);border-radius:2px;opacity:.75}
+.muted{color:var(--muted)}
+.zero{color:var(--line)}
+
+/* Filtros */
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.filters select,.filters input{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-height:40px}
+.filters input{flex:1;min-width:180px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+.seg button{border:0;background:var(--surface);padding:9px 14px;cursor:pointer;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--hydra);color:var(--hydra-ink)}
+.budget{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.budget .card{padding:14px 16px}
+.budget b{font:600 1.35rem var(--fc)}
+
+/* Formulários */
+dialog{border:0;border-radius:14px;padding:0;width:min(680px,calc(100vw - 20px));max-height:calc(100dvh - 30px);background:var(--surface);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(20,24,28,.45)}
+dialog form{display:flex;flex-direction:column;max-height:calc(100dvh - 30px)}
+dialog header{padding:16px 20px;border-bottom:1px solid var(--line)}
+dialog .grid{padding:16px 20px;overflow-y:auto}
+dialog footer{display:flex;gap:8px;padding:12px 20px;border-top:1px solid var(--line)}
+dialog footer .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 14px}
+.fld{display:flex;flex-direction:column;gap:4px;grid-column:span 1}
+.fld.w2{grid-column:span 2}.fld.full,.sec.full{grid-column:1/-1}
+.fld span{font-size:.86rem;color:var(--muted)}
+.fld input,.fld select,.fld textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:9px 10px;min-height:42px;width:100%}
+.fld textarea{resize:vertical}
+.fld small{color:var(--muted);font-size:.8rem}
+.grid>.sec:first-child{border-top:0;padding-top:0;margin-top:0}
+.sec{margin:8px 0 -2px;padding-top:10px;border-top:1px dashed var(--line);font-size:1.05rem}
+.set{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.set .grid{padding:0;margin:12px 0}
+.set p{margin:.3rem 0 .8rem;color:var(--muted);max-width:70ch}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:99;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%)}
+#print{display:none}
+
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr}
+  .hero-act{min-width:0}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(3){border-left:0;padding-left:0}
+  .stat:nth-child(n+3){border-top:1px solid var(--line)}
+  .grid{grid-template-columns:1fr 1fr}
+  .fld.w2{grid-column:1/-1}
+  .veh span{display:none}
+  .scroll table{min-width:780px}
+}
+@media (max-width:460px){.grid{grid-template-columns:1fr}.fld,.fld.w2{grid-column:1/-1}.sync span{display:none}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+
+@media print{
+  body>*:not(#print){display:none!important}
+  #print{display:block;color:#000;font:11pt/1.35 var(--f)}
+  #print h1{font-size:16pt;margin-bottom:6px}
+  #print table{font-size:9.5pt}
+  #print th,#print td{border:1px solid #888;padding:4px 6px;color:#000}
+  #print th{background:#eee}
+  #print .ph{display:flex;gap:24px;margin:6px 0 12px}
+  @page{size:A4 landscape;margin:12mm}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="plate" aria-label="Matrícula"><span class="eu">P</span><span class="n" id="hMat"></span></div>
+    <div class="veh"><b id="hVeh"></b><span>Diário de viatura</span></div>
+    <div class="sync" id="hSync"><i></i><span></span></div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main id="view"></main>
+<dialog id="dlg"><form id="frm" novalidate></form></dialog>
+<datalist id="dl-cond"></datalist>
+<datalist id="dl-tipoman"><option>Revisão</option><option>Mudança de óleo</option><option>Reparação</option><option>Garantia</option><option>Lavagem</option><option>Outro</option></datalist>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<div class="toast" id="toast" role="status"></div>
+<div id="print"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script>
+const SEED = {"config": {"viatura": {"marca": "Toyota", "modelo": "Hilux", "matricula": "CA13IS"}, "categorias": ["Açores Natura", "Barreira Porto Pim", "Deslocações Gerais - Lavagem viatura", "Deslocações Gerais - Transporte pessoal", "Deslocações Gerais - Serviço Externo", "Lixo Marinho", "Manutenção", "RACA", "SOS Cagarro"], "pagamentos": ["GALP Frota", "DRPM - pag. FM", "DSBPM - pag. FM"], "pagamentoOrcamento": "GALP Frota", "orcamento": {"2026": 1140, "2027": 2120, "2028": 190}, "inspecaoDias": 30, "cartaAvisoDias": 60}, "viagens": [{"id": "v0001", "dataSaida": "2026-04-21", "horaSaida": "11:23", "kmSaida": 21, "dataEntrada": "2026-04-21", "horaEntrada": "11:44", "kmEntrada": 25, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Transporte elementos Blue Azores à Escola do Mar dos Açores", "obs": ""}, {"id": "v0002", "dataSaida": "2026-04-28", "horaSaida": "09:10", "kmSaida": 25, "dataEntrada": "2026-04-28", "horaEntrada": "13:13", "kmEntrada": 96, "condutor": "Nuno Prazeres", "categoria": "Lixo Marinho", "servico": "Microplásticos Porto Pim, Praia Almoxarife e Fajã", "obs": ""}, {"id": "v0003", "dataSaida": "2026-04-29", "horaSaida": "14:08", "kmSaida": 96, "dataEntrada": "2026-04-29", "horaEntrada": "15:01", "kmEntrada": 105, "condutor": "Nuno Prazeres", "categoria": "SOS Cagarro", "servico": "SOS Cagarro - transporte de animais mortos do laboratório para DOP", "obs": ""}, {"id": "v0004", "dataSaida": "2026-05-06", "horaSaida": "14:05", "kmSaida": 105, "dataEntrada": "2026-05-06", "horaEntrada": "16:45", "kmEntrada": 120, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura *", "obs": "Viagem da Feteira (zona da Laginha até ao Porto da Horta) - viatura com atrelado e embarcação conduzida pelo funcionário da Escola do Mar - António, por indicação do Sr. DRPM"}, {"id": "v0005", "dataSaida": "2026-05-12", "horaSaida": "10:26", "kmSaida": 120, "dataEntrada": "2026-05-12", "horaEntrada": "11:29", "kmEntrada": 131, "condutor": "Nuno Prazeres", "categoria": "RACA", "servico": "Terauto e apanhar caixas RACA no Aquário", "obs": ""}, {"id": "v0006", "dataSaida": "2026-05-18", "horaSaida": "12:55", "kmSaida": 131, "dataEntrada": "2026-05-18", "horaEntrada": "14:36", "kmEntrada": 137, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Movimentação do Açores Natura na zona de varagem", "obs": ""}, {"id": "v0007", "dataSaida": "2026-05-20", "horaSaida": "20:00", "kmSaida": 137, "dataEntrada": "2026-05-20", "horaEntrada": "21:00", "kmEntrada": 145, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Lavagem viatura", "servico": "Lavagem viatura", "obs": ""}, {"id": "v0008", "dataSaida": "2026-05-21", "horaSaida": "08:50", "kmSaida": 145, "dataEntrada": "2026-05-21", "horaEntrada": "10:44", "kmEntrada": 153, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura", "obs": ""}, {"id": "v0009", "dataSaida": "2026-05-27", "horaSaida": "10:25", "kmSaida": 153, "dataEntrada": "2026-05-27", "horaEntrada": "11:50", "kmEntrada": 158, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura", "obs": ""}, {"id": "v0010", "dataSaida": "2026-05-27", "horaSaida": "14:30", "kmSaida": 158, "dataEntrada": "2026-05-27", "horaEntrada": "15:00", "kmEntrada": 162, "condutor": "Nuno Prazeres", "categoria": "Barreira Porto Pim", "servico": "EMA - Verificar estado da barreira", "obs": ""}, {"id": "v0011", "dataSaida": "2026-05-28", "horaSaida": "11:24", "kmSaida": 162, "dataEntrada": "2026-05-28", "horaEntrada": "12:31", "kmEntrada": 165, "condutor": "Nuno Prazeres", "categoria": "Barreira Porto Pim", "servico": "EMA - Manutenção da barreira", "obs": ""}, {"id": "v0012", "dataSaida": "2026-06-05", "horaSaida": "14:10", "kmSaida": 165, "dataEntrada": "2026-06-05", "horaEntrada": "14:32", "kmEntrada": 172, "condutor": "Nuno Prazeres", "categoria": "Manutenção", "servico": "Terauto - Pedido orçamento", "obs": ""}, {"id": "v0013", "dataSaida": "2026-06-08", "horaSaida": "13:54", "kmSaida": 172, "dataEntrada": "2026-06-08", "horaEntrada": "15:23", "kmEntrada": 181, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura", "obs": ""}, {"id": "v0014", "dataSaida": "2026-06-23", "horaSaida": "15:17", "kmSaida": 181, "dataEntrada": "2026-06-23", "horaEntrada": "15:50", "kmEntrada": 190, "condutor": "Fernando Cardoso", "categoria": "SOS Cagarro", "servico": "SOS Cagarro - Transporte animais mortos para Laboratório DRPM", "obs": ""}, {"id": "v0015", "dataSaida": "2026-06-29", "horaSaida": "08:25", "kmSaida": 190, "dataEntrada": "2026-06-29", "horaEntrada": "09:47", "kmEntrada": 198, "condutor": "João Lagoa", "categoria": "Manutenção", "servico": "Garantia Terauto - Substituição pernes rodas", "obs": ""}, {"id": "v0016", "dataSaida": "2026-07-09", "horaSaida": "08:49", "kmSaida": 198, "dataEntrada": "2026-07-09", "horaEntrada": "09:36", "kmEntrada": 221, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Transporte Sr. DRPM e Sr. DSBPM para Aeroporto", "obs": ""}, {"id": "v0017", "dataSaida": "2026-07-14", "horaSaida": "10:34", "kmSaida": 221, "dataEntrada": "2026-07-14", "horaEntrada": "11:07", "kmEntrada": 228, "condutor": "Nuno Prazeres", "categoria": "Manutenção", "servico": "Abastecimento", "obs": ""}, {"id": "v0018", "dataSaida": "2026-07-15", "horaSaida": "09:14", "kmSaida": 228, "dataEntrada": "2026-07-15", "horaEntrada": "12:00", "kmEntrada": 255, "condutor": "Nuno Prazeres", "categoria": "Lixo Marinho", "servico": "Microplásticos Porto Pim, Praia Almoxarife", "obs": ""}, {"id": "v0019", "dataSaida": "2026-07-15", "horaSaida": "13:34", "kmSaida": 255, "dataEntrada": "2026-07-15", "horaEntrada": "16:20", "kmEntrada": 322, "condutor": "Nuno Prazeres", "categoria": "Lixo Marinho", "servico": "Microplásticos Praia da Fajã", "obs": ""}, {"id": "v0020", "dataSaida": "2026-07-17", "horaSaida": "10:17", "kmSaida": 322, "dataEntrada": "2026-07-17", "horaEntrada": "11:06", "kmEntrada": 342, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Transporte Sr. DSBPM e Raquel Martins", "obs": ""}, {"id": "v0021", "dataSaida": "2026-07-20", "horaSaida": "09:26", "kmSaida": 342, "dataEntrada": "2026-07-20", "horaEntrada": "09:47", "kmEntrada": 345, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Serviço Externo", "servico": "Deslocações Gerais - Projetor SRMP", "obs": ""}, {"id": "v0022", "dataSaida": "2026-07-21", "horaSaida": "08:34", "kmSaida": 345, "dataEntrada": "2026-07-21", "horaEntrada": "13:09", "kmEntrada": 348, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Saída Açores Natura - Transetos", "obs": ""}, {"id": "v0023", "dataSaida": "2026-07-23", "horaSaida": "15:30", "kmSaida": 348, "dataEntrada": "2026-07-23", "horaEntrada": "15:57", "kmEntrada": 350, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Transporte Pessoal da DRPM - Maria e Júlia - Terminal Marítimo", "obs": ""}, {"id": "v0024", "dataSaida": "2026-07-24", "horaSaida": "14:40", "kmSaida": 350, "dataEntrada": "2026-07-24", "horaEntrada": "15:00", "kmEntrada": 355, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Deslocações Gerais - Açores Natura - Transetos", "obs": ""}, {"id": "v0025", "dataSaida": "2026-07-27", "horaSaida": "15:00", "kmSaida": 355, "dataEntrada": "2026-07-27", "horaEntrada": "15:48", "kmEntrada": 376, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Deslocações Gerais - Transporte pessoal - Maria - Aeroporto", "obs": ""}, {"id": "v0026", "dataSaida": "2026-07-31", "horaSaida": "11:07", "kmSaida": 376, "dataEntrada": "2026-07-31", "horaEntrada": "11:32", "kmEntrada": 380, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Deslocações Gerais - Açores Natura - Teste pranchas orientação", "obs": ""}, {"id": "v0027", "dataSaida": "2026-08-03", "horaSaida": "08:44", "kmSaida": 380, "dataEntrada": "2026-08-11", "horaEntrada": "11:16", "kmEntrada": 389, "condutor": "Nuno Prazeres", "categoria": "Manutenção", "servico": "Manutenção / Reparação de 03/08 a 11/08", "obs": ""}, {"id": "v0028", "dataSaida": "2026-08-17", "horaSaida": "09:36", "kmSaida": 389, "dataEntrada": "2026-08-17", "horaEntrada": "11:16", "kmEntrada": 397, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura", "obs": ""}, {"id": "v0029", "dataSaida": "2026-08-17", "horaSaida": "13:22", "kmSaida": 397, "dataEntrada": "2026-08-17", "horaEntrada": "15:30", "kmEntrada": 406, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Varagem Açores Natura", "obs": ""}, {"id": "v0030", "dataSaida": "2026-08-18", "horaSaida": "08:40", "kmSaida": 406, "dataEntrada": "2026-08-18", "horaEntrada": "16:31", "kmEntrada": 409, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Açores Natura - Transetos", "obs": ""}, {"id": "v0031", "dataSaida": "2026-08-19", "horaSaida": "19:31", "kmSaida": 409, "dataEntrada": "2026-08-19", "horaEntrada": "20:20", "kmEntrada": 416, "condutor": "Nuno Prazeres", "categoria": "Açores Natura", "servico": "Açores Natura - Transporte atrelado", "obs": ""}, {"id": "v0032", "dataSaida": "2026-08-25", "horaSaida": "10:42", "kmSaida": 416, "dataEntrada": "2026-08-25", "horaEntrada": "12:31", "kmEntrada": 424, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Serviço Externo", "servico": "Cais Comercial - Visita ao Navio Pourquoi pas?", "obs": ""}, {"id": "v0033", "dataSaida": "2026-08-31", "horaSaida": "09:47", "kmSaida": 424, "dataEntrada": "2026-08-31", "horaEntrada": "16:57", "kmEntrada": 428, "condutor": "João Lagoa", "categoria": "Açores Natura", "servico": "Açores Natura - Transetos", "obs": ""}, {"id": "v0034", "dataSaida": "2026-09-01", "horaSaida": "09:16", "kmSaida": 428, "dataEntrada": "2026-09-01", "horaEntrada": "10:49", "kmEntrada": 441, "condutor": "Nuno Prazeres", "categoria": "RACA", "servico": "RACA - Remoção Golfinho", "obs": ""}, {"id": "v0035", "dataSaida": "2026-09-08", "horaSaida": "09:40", "kmSaida": 441, "dataEntrada": "2026-09-08", "horaEntrada": "13:50", "kmEntrada": 505, "condutor": "João Lagoa", "categoria": "Deslocações Gerais - Serviço Externo", "servico": "Drone MAC", "obs": ""}, {"id": "v0036", "dataSaida": "2026-09-18", "horaSaida": "09:42", "kmSaida": 505, "dataEntrada": "2026-09-18", "horaEntrada": "15:06", "kmEntrada": 564, "condutor": "Nuno Prazeres", "categoria": "SOS Cagarro", "servico": "SOS Cagarro - Anilhagem", "obs": ""}, {"id": "v0037", "dataSaida": "2026-09-22", "horaSaida": "14:58", "kmSaida": 564, "dataEntrada": "2026-09-22", "horaEntrada": "15:41", "kmEntrada": 586, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Transporte pessoal", "servico": "Deslocações Gerais - DSBPM - Aeroporto", "obs": ""}, {"id": "v0038", "dataSaida": "2026-09-23", "horaSaida": "15:23", "kmSaida": 586, "dataEntrada": "2026-09-23", "horaEntrada": "16:19", "kmEntrada": 592, "condutor": "Nuno Prazeres", "categoria": "Deslocações Gerais - Serviço Externo", "servico": "Deslocações Gerais - Laboratório DRPM", "obs": ""}, {"id": "v0039", "dataSaida": "2026-09-29", "horaSaida": "12:30", "kmSaida": 592, "dataEntrada": "2026-09-29", "horaEntrada": "12:49", "kmEntrada": 594, "condutor": "Nuno Prazeres", "categoria": "SOS Cagarro", "servico": "SOS Cagarro - Transporte de caixas", "obs": ""}], "abastecimentos": [{"id": "a0040", "data": "2026-04-15", "km": 21, "litros": 30.47, "valor": 50, "fatura": "900811004/228225", "condutor": "Rui Martins", "pagamento": "DRPM - pag. FM", "obs": ""}, {"id": "a0041", "data": "2026-07-14", "km": 223, "litros": 28.52, "valor": 50, "fatura": "FA00014023", "condutor": "Nuno Prazeres", "pagamento": "DSBPM - pag. FM", "obs": ""}, {"id": "a0042", "data": "2026-09-08", "km": 444, "litros": 59.25, "valor": 111.69, "fatura": "FA000002224", "condutor": "João Lagoa", "pagamento": "GALP Frota", "obs": ""}], "pneus": [], "inspecoes": [{"id": "i0043", "data": "2026-04-30", "pneus": "OK", "luzes": "OK", "travoes": "OK", "oleo": "OK", "liquidos": "OK", "extintor": "Não tem", "diversos": "Alguns pernes das rodas com sinais de ferrugem/corrusão.", "observacoes": "Situção reportada superiormente e elaborado email para o Concessionário remetido a 2026-05-08. Foi respondido pelo Concessionário para passarmos com a viatura nas suas instalações, para verificação da situação e elaboração de processo de garantia.", "assinatura": "Nuno Prazeres", "seguimento": "18-05-2026 - Contato da Carina a informar que a Toyota assume a substituição dos pernes. Aguardar chegada dos mesmos e contato para substituição dos mesmos.\n29-06-2026 - Substituição dos pernes das rodas."}, {"id": "i0044", "data": "2026-06-01", "pneus": "OK", "luzes": "OK", "travoes": "OK", "oleo": "OK", "liquidos": "OK", "extintor": "Não tem", "diversos": "", "observacoes": "Alguns parafusos das \"argolas\" da caixa a enferrujar", "assinatura": "Nuno Prazeres", "seguimento": ""}, {"id": "i0045", "data": "2026-07-07", "pneus": "OK", "luzes": "OK", "travoes": "OK", "oleo": "OK", "liquidos": "OK", "extintor": "Não tem", "diversos": "Necessidade de lavagem da viatura", "observacoes": "", "assinatura": "", "seguimento": ""}], "manutencoes": [{"id": "m0046", "data": "2026-07-29", "tipo": "Garantia", "descricao": "Substituição de parafusos (pernes) das rodas - Garantia", "fornecedor": "Toyota", "custo": 0, "km": null, "obs": ""}], "regeneracoes": [], "condutores": [{"id": "c0047", "nome": "Nuno Prazeres", "carta": "", "validade": "", "despacho": "", "reboque": ""}, {"id": "c0048", "nome": "João Lagoa", "carta": "", "validade": "", "despacho": "", "reboque": ""}, {"id": "c0049", "nome": "Fernando Cardoso", "carta": "", "validade": "", "despacho": "", "reboque": ""}, {"id": "c0050", "nome": "Rui Martins", "carta": "", "validade": "", "despacho": "", "reboque": ""}], "acidentes": [{"id": "x0051", "data": "2026-06-03", "hora": "17:50", "local": "Rua D. Pedro IV - Estacionamento", "condutor": "--", "descricao": "Viatura encontrava-se estacionada, tendo outra viatura batido na mesma ao efetuar manobra. (Reg. fotográfico na pasta referente à viatura)", "danos": "Farolim traseiro (lado condutor), mossa abaixo do farolim e para-choques esfolado.", "entidades": "DRPM / Particular", "participacao": "Não"}]};
+const LS='diarioViatura_v1', LSFB='diarioViatura_fb', LSP='diarioViatura_pref';
+const TIPOS=['viagens','abastecimentos','pneus','inspecoes','manutencoes','regeneracoes','condutores','acidentes'];
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MES3=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const ESTADOS=['OK','Não conforme','Não tem'];
+
+const $=s=>document.querySelector(s);
+const pad=n=>String(n).padStart(2,'0');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';
+const fmtN=(v,dec=0)=>v==null||v===''||isNaN(v)?'—':Number(v).toLocaleString('pt-PT',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const eur=v=>v==null||isNaN(v)?'—':Number(v).toLocaleString('pt-PT',{style:'currency',currency:'EUR'});
+const hoje=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const agora=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const dias=(a,b)=>Math.round((Date.parse(b)-Date.parse(a))/864e5);
+const sum=(arr,f)=>arr.reduce((s,x)=>s+(Number(f(x))||0),0);
+const nl=s=>esc(s).replace(/\n/g,'<br>');
+
+function fmtMat(m){m=(m||'').toUpperCase().replace(/[\s-]/g,'');return /^[A-Z0-9]{6}$/.test(m)?m.match(/../g).join('-'):m}
+function fmtDur(min){if(min==null||isNaN(min))return '—';if(min>=1440){const th=Math.round(min/60);return `${Math.floor(th/24)} d ${th%24} h`}return `${Math.floor(min/60)}h${pad(Math.round(min%60))}`}
+
+/* ---------- Estado ---------- */
+function defaultConfig(){return{viatura:{marca:'',modelo:'',matricula:''},categorias:['Deslocações Gerais'],pagamentos:['GALP Frota'],pagamentoOrcamento:'GALP Frota',orcamento:{},inspecaoDias:30,cartaAvisoDias:60}}
+function vazio(){const o={config:defaultConfig()};TIPOS.forEach(t=>o[t]=[]);return o}
+function norm(x){const o=vazio();x=x||{};o.config={...o.config,...(x.config||{})};o.config.viatura={...defaultConfig().viatura,...((x.config||{}).viatura||{})};TIPOS.forEach(t=>o[t]=Array.isArray(x[t])?x[t]:[]);return o}
+function load(){try{const x=JSON.parse(localStorage.getItem(LS));if(x&&x.config)return norm(x)}catch(e){}return norm(JSON.parse(JSON.stringify(SEED||vazio())))}
+let S=load();
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){toast('Não foi possível guardar neste equipamento')}}
+const pref=JSON.parse(localStorage.getItem(LSP)||'{}');
+const savePref=()=>localStorage.setItem(LSP,JSON.stringify(pref));
+
+const aberta=v=>v.kmEntrada==null||!v.horaEntrada||!v.dataEntrada;
+const viagemAberta=()=>S.viagens.find(aberta);
+const kmFeitos=v=>v.kmEntrada!=null&&v.kmSaida!=null?v.kmEntrada-v.kmSaida:null;
+function minutos(v){if(aberta(v)||!v.horaSaida)return null;const m=(new Date(v.dataEntrada+'T'+v.horaEntrada)-new Date(v.dataSaida+'T'+v.horaSaida))/6e4;return m>=0?m:null}
+function kmAtual(){let m=0;S.viagens.forEach(v=>{m=Math.max(m,v.kmEntrada??0,v.kmSaida??0)});['abastecimentos','pneus','manutencoes','regeneracoes'].forEach(t=>S[t].forEach(r=>{if(r.km!=null)m=Math.max(m,r.km)}));return m}
+const kV=v=>(v.dataSaida||'')+(v.horaSaida||'');
+const kD=r=>(r.data||'')+(r.hora||'');
+const nomesCond=()=>[...new Set([...S.condutores.map(c=>c.nome),...S.viagens.map(v=>v.condutor)].filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b,'pt'));
+function anos(){const s=new Set([String(new Date().getFullYear())]);S.viagens.forEach(v=>v.dataSaida&&s.add(v.dataSaida.slice(0,4)));['abastecimentos','inspecoes','manutencoes'].forEach(t=>S[t].forEach(r=>r.data&&s.add(r.data.slice(0,4))));Object.keys(S.config.orcamento||{}).forEach(y=>s.add(y));return [...s].sort().reverse()}
+
+/* ---------- Esquemas de registo ---------- */
+const SC={
+ viagens:{nome:'saída',campos:[
+  {t:'sec',l:'Saída'},
+  {k:'dataSaida',l:'Data',t:'date',req:1},{k:'horaSaida',l:'Hora',t:'time',req:1},{k:'kmSaida',l:'Km à saída',t:'number',step:1,req:1},
+  {k:'condutor',l:'Condutor',list:'dl-cond',req:1},{k:'categoria',l:'Categoria',t:'select',opts:()=>S.config.categorias,req:1,w:2},
+  {k:'servico',l:'Serviço efetuado',t:'textarea',req:1,full:1},
+  {t:'sec',l:'Entrada',hint:'Preencher no regresso da viatura'},
+  {k:'dataEntrada',l:'Data',t:'date'},{k:'horaEntrada',l:'Hora',t:'time'},{k:'kmEntrada',l:'Km à entrada',t:'number',step:1},
+  {k:'obs',l:'Observações',t:'textarea',full:1}],
+  def:()=>({dataSaida:hoje(),horaSaida:agora(),kmSaida:kmAtual()||null,condutor:pref.condutor||'',categoria:''}),
+  validar(r){
+   const n=[r.dataEntrada,r.horaEntrada,r.kmEntrada].filter(x=>x!==''&&x!=null).length;
+   if(n>0&&n<3)return 'Para registar a entrada preencha a data, a hora e os km de entrada.';
+   if(n===3){if(r.kmEntrada<r.kmSaida)return 'Os km de entrada não podem ser inferiores aos km de saída.';
+     if(r.dataEntrada+'T'+r.horaEntrada<r.dataSaida+'T'+r.horaSaida)return 'A entrada não pode ser anterior à saída.'}
+   const outra=S.viagens.find(v=>v.id!==r.id&&aberta(v));
+   if(outra&&aberta(r))return `Já existe uma saída em curso (${fmtD(outra.dataSaida)}, ${outra.condutor}). Registe primeiro a entrada dessa saída.`;
+  },
+  aviso(r){const ant=S.viagens.filter(v=>v.id!==r.id&&!aberta(v)&&kV(v)<=kV(r)).sort((a,b)=>kV(b).localeCompare(kV(a)))[0];
+   if(ant&&ant.kmEntrada!==r.kmSaida)return `Os km de saída (${r.kmSaida}) não coincidem com os km da última entrada (${ant.kmEntrada}, a ${fmtD(ant.dataEntrada)}). Guardar mesmo assim?`},
+  depois(r){pref.condutor=r.condutor;savePref()}},
+ abastecimentos:{nome:'abastecimento',campos:[
+  {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km no abastecimento',t:'number',step:1,req:1},{k:'litros',l:'Litros',t:'number',step:'0.01',req:1},
+  {k:'valor',l:'Valor (€)',t:'number',step:'0.01',req:1},{k:'fatura',l:'N.º da fatura'},{k:'pagamento',l:'Pagamento',t:'select',opts:()=>S.config.pagamentos},
+  {k:'condutor',l:'Rubrica',list:'dl-cond'},{k:'obs',l:'Observações',w:2}],
+  def:()=>({data:hoje(),km:kmAtual()||null,condutor:pref.condutor||'',pagamento:S.config.pagamentoOrcamento||''})},
+ pneus:{nome:'substituição de pneus',campos:[
+  {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km',t:'number',step:1,req:1},{k:'oficina',l:'Oficina'},
+  {k:'observacoes',l:'Observações',t:'textarea',full:1},{k:'condutor',l:'Rubrica',list:'dl-cond'}],
+  def:()=>({data:hoje(),km:kmAtual()||null})},
+ inspecoes:{nome:'inspeção mensal',campos:[
+  {k:'data',l:'Data',t:'date',req:1},
+  {k:'pneus',l:'Pneus',t:'select',opts:ESTADOS,req:1},{k:'luzes',l:'Luzes',t:'select',opts:ESTADOS,req:1},
+  {k:'travoes',l:'Travões',t:'select',opts:ESTADOS,req:1},{k:'oleo',l:'Óleo',t:'select',opts:ESTADOS,req:1},
+  {k:'liquidos',l:'Líquidos',t:'select',opts:ESTADOS,req:1},{k:'extintor',l:'Extintor',t:'select',opts:ESTADOS,req:1},
+  {k:'diversos',l:'Diversos',t:'textarea',full:1},{k:'observacoes',l:'Observações',t:'textarea',full:1},
+  {k:'assinatura',l:'Assinatura (nome)',list:'dl-cond',w:2},
+  {k:'seguimento',l:'Seguimento da situação',t:'textarea',rows:3,full:1,hint:'Contactos, pedidos e resolução — pode ir acrescentando linhas com a data.'}],
+  def:()=>({data:hoje(),pneus:'OK',luzes:'OK',travoes:'OK',oleo:'OK',liquidos:'OK',extintor:'OK',assinatura:pref.condutor||''})},
+ manutencoes:{nome:'manutenção / reparação',campos:[
+  {k:'data',l:'Data',t:'date',req:1},{k:'tipo',l:'Tipo de operação',list:'dl-tipoman',req:1},{k:'km',l:'Km',t:'number',step:1},
+  {k:'descricao',l:'Descrição',t:'textarea',full:1},{k:'fornecedor',l:'Fornecedor / oficina'},{k:'custo',l:'Custo (€)',t:'number',step:'0.01'},
+  {k:'obs',l:'Observações',t:'textarea',full:1}],
+  def:()=>({data:hoje(),km:kmAtual()||null})},
+ regeneracoes:{nome:'regeneração do filtro de partículas',campos:[
+  {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km',t:'number',step:1},{k:'tipo',l:'Tipo de regeneração',t:'select',opts:['Passiva (em andamento)','Ativa (automática)','Forçada (oficina)']},
+  {k:'duracao',l:'Duração (min)',t:'number',step:1},{k:'resultado',l:'Resultado',t:'select',opts:['Concluída','Interrompida','Falhou']},
+  {k:'obs',l:'Observações',t:'textarea',full:1}],
+  def:()=>({data:hoje(),km:kmAtual()||null})},
+ condutores:{nome:'condutor',campos:[
+  {k:'nome',l:'Nome',req:1,w:2},{k:'carta',l:'Carta de condução'},{k:'validade',l:'Validade da carta',t:'date'},
+  {k:'despacho',l:'Despacho de autorização'},{k:'reboque',l:'Habilitado para reboque',t:'select',opts:['Não','Sim']}],
+  def:()=>({reboque:'Não'}),
+  validar(r){if(S.condutores.some(c=>c.id!==r.id&&c.nome.toLowerCase()===r.nome.toLowerCase()))return 'Já existe um condutor com esse nome.'}},
+ acidentes:{nome:'acidente',campos:[
+  {k:'data',l:'Data',t:'date',req:1},{k:'hora',l:'Hora',t:'time'},{k:'condutor',l:'Condutor',list:'dl-cond'},
+  {k:'local',l:'Local',req:1,full:1},{k:'descricao',l:'Descrição do acidente',t:'textarea',rows:3,req:1,full:1},
+  {k:'danos',l:'Danos',t:'textarea',full:1},{k:'entidades',l:'Entidades envolvidas',w:2},{k:'participacao',l:'Participação',t:'select',opts:['Não','Sim']}],
+  def:()=>({data:hoje(),participacao:'Não'})}
+};
+
+/* ---------- Formulário genérico ---------- */
+function campoHTML(f,val){
+ if(f.t==='sec')return `<h3 class="sec full">${f.l}${f.hint?` <small class="muted" style="font:400 .85rem var(--f)">— ${f.hint}</small>`:''}</h3>`;
+ const id='f_'+f.k,req=f.req?' required':'',v=val??'';let inp;
+ if(f.t==='select'){const opts=typeof f.opts==='function'?f.opts():f.opts;const list=[...opts];if(v!==''&&!list.includes(v))list.unshift(v);
+  inp=`<select id="${id}" name="${f.k}"${req}><option value=""${v===''?' selected':''}>—</option>${list.map(o=>`<option${o===v?' selected':''}>${esc(o)}</option>`).join('')}</select>`}
+ else if(f.t==='textarea')inp=`<textarea id="${id}" name="${f.k}" rows="${f.rows||2}"${req}>${esc(v)}</textarea>`;
+ else inp=`<input id="${id}" name="${f.k}" type="${f.t||'text'}" value="${esc(v)}"${req}${f.t==='number'?` step="${f.step||'any'}" min="0" inputmode="${f.step===1?'numeric':'decimal'}"`:''}${f.list?` list="${f.list}"`:''} autocomplete="off">`;
+ return `<label class="fld${f.full?' full':f.w===2?' w2':''}" for="${id}"><span>${f.l}${f.req?' *':''}</span>${inp}${f.hint?`<small>${f.hint}</small>`:''}</label>`;
+}
+function abrirForm(tipo,id,preset={}){
+ const sc=SC[tipo],ex=id?S[tipo].find(r=>r.id===id):null;
+ const rec={...(ex?ex:(sc.def?sc.def():{})),...preset};
+ $('#dl-cond').innerHTML=nomesCond().map(n=>`<option value="${esc(n)}">`).join('');
+ const frm=$('#frm');
+ frm.innerHTML=`<header><h2>${ex?'Editar':'Registar'} ${sc.nome}</h2></header>
+  <div class="grid">${sc.campos.map(f=>campoHTML(f,rec[f.k])).join('')}</div>
+  <footer>${ex?`<button type="button" class="btn danger" id="fDel">Eliminar</button>`:''}<span class="sp"></span>
+  <button type="button" class="btn" id="fCancel">Cancelar</button><button type="submit" class="btn primary">Guardar</button></footer>`;
+ $('#fCancel').onclick=()=>$('#dlg').close();
+ if(ex)$('#fDel').onclick=()=>{if(confirm(`Eliminar este registo de ${sc.nome}? Esta ação não pode ser anulada.`)){remover(tipo,ex.id);$('#dlg').close();render();toast('Registo eliminado')}};
+ frm.onsubmit=e=>{
+  e.preventDefault();
+  if(!frm.reportValidity())return;
+  const r={...(ex||{}),id:ex?ex.id:uid()};
+  sc.campos.forEach(f=>{if(f.t==='sec')return;const v=frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
+  const err=sc.validar&&sc.validar(r);if(err){alert(err);return}
+  const w=sc.aviso&&sc.aviso(r);if(w&&!confirm(w))return;
+  guardar(tipo,r);sc.depois&&sc.depois(r);$('#dlg').close();render();toast('Registo guardado');
+ };
+ $('#dlg').showModal();
+ const foco=preset.dataEntrada?frm.elements.kmEntrada:frm.querySelector('input,select,textarea');
+ if(foco&&!matchMedia('(pointer:coarse)').matches)foco.focus();
+}
+function guardar(tipo,r){const i=S[tipo].findIndex(x=>x.id===r.id);if(i>=0)S[tipo][i]=r;else S[tipo].push(r);saveLocal();fbSet(tipo,r)}
+function remover(tipo,id){S[tipo]=S[tipo].filter(x=>x.id!==id);saveLocal();fbDel(id)}
+
+/* ---------- Tabelas ---------- */
+function tabela(tipo,rows,cols,foot){
+ if(!rows.length)return `<div class="card empty">Ainda não há registos. Use o botão acima para adicionar o primeiro.</div>`;
+ return `<div class="card scroll"><table><thead><tr>${cols.map(c=>`<th class="${c.c||''}">${c.l}</th>`).join('')}</tr></thead>
+ <tbody>${rows.map(r=>`<tr data-id="${r.id}" data-tipo="${tipo}" tabindex="0">${cols.map(c=>`<td class="${c.c||''}">${c.v(r)}</td>`).join('')}</tr>`).join('')}</tbody>
+ ${foot?`<tfoot><tr>${foot.map(f=>`<td class="${f.c||''}"${f.span?` colspan="${f.span}"`:''}>${f.v}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
+}
+const estadoB=v=>!v?'<span class="b mut">—</span>':v==='OK'?'<span class="b ok">OK</span>':v==='Não tem'?'<span class="b mut">Não tem</span>':`<span class="b bad">${esc(v)}</span>`;
+
+/* ---------- Cálculos ---------- */
+function galp(ano){const c=S.config,prev=Number((c.orcamento||{})[ano])||0;
+ const gasto=sum(S.abastecimentos.filter(a=>a.pagamento===c.pagamentoOrcamento&&(a.data||'').startsWith(ano)),a=>a.valor);
+ return{prev,gasto,rest:prev-gasto,pct:prev?gasto/prev:0}}
+function abastCalc(){const l=[...S.abastecimentos].sort((a,b)=>kD(a).localeCompare(kD(b)));
+ return l.map((a,i)=>{const p=l[i-1];const km=p&&a.km!=null&&p.km!=null?a.km-p.km:null;
+  return{...a,difDias:p?dias(p.data,a.data):null,kmDesde:km,consumo:km>0&&a.litros?a.litros/km*100:null}})}
+function alertas(){
+ const c=S.config,al=[],h=hoje(),ab=viagemAberta();
+ const ins=[...S.inspecoes].sort((a,b)=>kD(b).localeCompare(kD(a)))[0];
+ if(!ins)al.push({n:'warn',t:'Ainda não há inspeções mensais registadas.'});
+ else{const d=dias(ins.data,h);if(d>c.inspecaoDias)al.push({n:'warn',t:`Inspeção mensal em atraso — a última foi a ${fmtD(ins.data)}, há ${d} dias. <button class="btn sm" data-act="novo" data-tipo="inspecoes">Registar inspeção</button>`});
+  const nc=['pneus','luzes','travoes','oleo','liquidos'].filter(k=>ins[k]==='Não conforme');
+  if(nc.length)al.push({n:'bad',t:`A última inspeção (${fmtD(ins.data)}) tem pontos não conformes: ${nc.map(k=>SC.inspecoes.campos.find(f=>f.k===k).l.toLowerCase()).join(', ')}.`})}
+ S.condutores.forEach(k=>{if(!k.validade)return;const d=dias(h,k.validade);
+  if(d<0)al.push({n:'bad',t:`A carta de condução de ${esc(k.nome)} expirou a ${fmtD(k.validade)}.`});
+  else if(d<=c.cartaAvisoDias)al.push({n:'warn',t:`A carta de condução de ${esc(k.nome)} expira a ${fmtD(k.validade)} (daqui a ${d} dias).`})});
+ const y=h.slice(0,4),g=galp(y);
+ if(g.prev&&g.rest<0)al.push({n:'bad',t:`Orçamento ${esc(c.pagamentoOrcamento)} de ${y} ultrapassado em ${eur(-g.rest)}.`});
+ else if(g.prev&&g.pct>=.85)al.push({n:'warn',t:`Restam ${eur(g.rest)} do orçamento ${esc(c.pagamentoOrcamento)} de ${y}.`});
+ if(ab&&dias(ab.dataSaida,h)>=1)al.push({n:'info',t:`A saída de ${fmtD(ab.dataSaida)} ainda não tem entrada registada.`});
+ return al;
+}
+
+/* ---------- Vistas ---------- */
+const TABS=[['inicio','Início'],['diario','Diário'],['abastecimentos','Abastecimentos'],['inspecoes','Inspeções'],['manutencao','Manutenção'],['acidentes','Acidentes'],['condutores','Condutores'],['resumo','Resumo anual'],['definicoes','Definições']];
+let tab=location.hash.slice(1)||'inicio';if(!TABS.some(t=>t[0]===tab))tab='inicio';
+const F={ano:String(new Date().getFullYear()),mes:'',condutor:'',categoria:'',q:''};
+let subMan='manutencoes',anoRes=String(new Date().getFullYear());
+const V={};
+
+V.inicio=()=>{
+ const km=kmAtual(),ab=viagemAberta(),y=hoje().slice(0,4),al=alertas();
+ const vy=S.viagens.filter(v=>(v.dataSaida||'').startsWith(y)),ay=S.abastecimentos.filter(a=>(a.data||'').startsWith(y)),g=galp(y);
+ const ult=[...S.viagens].filter(v=>!aberta(v)).sort((a,b)=>kV(b).localeCompare(kV(a)))[0];
+ const dig=String(km).padStart(6,'0').split('');
+ const rec=[...S.viagens].sort((a,b)=>kV(b).localeCompare(kV(a))).slice(0,6);
+ return `<section class="hero">
+  <div><p class="lbl">Conta-quilómetros</p><div class="odo" aria-label="${km} quilómetros">${dig.map(d=>`<span>${d}</span>`).join('')}<em>km</em></div>
+  <p class="estado">${ab?`<span class="b warn">Em serviço</span> ${esc(ab.condutor)} saiu a ${fmtD(ab.dataSaida)} às ${ab.horaSaida} com ${fmtN(ab.kmSaida)} km — ${esc(ab.servico)}`
+   :`<span class="b ok">Disponível</span> ${ult?`Última entrada a ${fmtD(ult.dataEntrada)} às ${ult.horaEntrada}, por ${esc(ult.condutor)}.`:'Sem saídas registadas.'}`}</p></div>
+  <div class="hero-act">${ab?`<button class="btn primary big" data-act="entrada" data-id="${ab.id}">Registar entrada</button>`:`<button class="btn primary big" data-act="novo" data-tipo="viagens">Registar saída</button>`}
+   <button class="btn" data-act="novo" data-tipo="abastecimentos">Registar abastecimento</button>
+   <button class="btn" data-act="novo" data-tipo="inspecoes">Registar inspeção mensal</button></div></section>
+ ${al.length?`<section class="alerts">${al.map(a=>`<div class="al ${a.n}">${a.t}</div>`).join('')}</section>`:''}
+ <section><h2>Em ${y}</h2><div class="stats">
+  <div class="stat"><b>${vy.length}</b><span>saídas</span></div>
+  <div class="stat"><b>${fmtN(sum(vy,kmFeitos))}</b><span>km percorridos</span></div>
+  <div class="stat"><b>${fmtN(sum(ay,a=>a.litros),1)} L</b><span>combustível, ${eur(sum(ay,a=>a.valor))}</span></div>
+  <div class="stat"><b>${g.prev?eur(g.rest):'—'}</b><span>${g.prev?`restante do orçamento ${esc(S.config.pagamentoOrcamento)} (${eur(g.prev)})`:'orçamento de combustível não definido'}</span>
+   ${g.prev?`<div class="meter"><i class="${g.pct>=1?'bad':g.pct>=.85?'warn':''}" style="width:${Math.min(100,g.pct*100)}%"></i></div>`:''}</div>
+ </div></section>
+ <section><div class="head"><h2>Últimas saídas</h2><button class="btn sm" data-act="tab" data-tab="diario">Ver diário completo</button></div>
+ ${tabela('viagens',rec,colsViagens(true))}</section>`;
+};
+
+function colsViagens(curto){
+ const c=[{l:'Data',c:'nw',v:v=>fmtD(v.dataSaida)+(v.dataEntrada&&v.dataEntrada!==v.dataSaida?`<span class="sub">até ${fmtD(v.dataEntrada)}</span>`:'')},
+  {l:'Saída',c:'nw',v:v=>v.horaSaida},{l:'Entrada',c:'nw',v:v=>aberta(v)?'<span class="b warn">Em serviço</span>':v.horaEntrada},
+  {l:'Tempo',c:'num',v:v=>fmtDur(minutos(v))}];
+ if(!curto)c.push({l:'Km saída',c:'num',v:v=>fmtN(v.kmSaida)},{l:'Km entrada',c:'num',v:v=>fmtN(v.kmEntrada)});
+ c.push({l:'Km feitos',c:'num',v:v=>`<b>${fmtN(kmFeitos(v))}</b>`},
+  {l:'Serviço efetuado',v:v=>`${esc(v.servico)}<span class="sub">${esc(v.categoria)}${v.obs?' — '+esc(v.obs.slice(0,80))+(v.obs.length>80?'…':''):''}</span>`},
+  {l:'Condutor',c:'nw',v:v=>esc(v.condutor)});
+ return c;
+}
+function filtrarViagens(){const q=F.q.toLowerCase();return S.viagens.filter(v=>(!F.ano||(v.dataSaida||'').startsWith(F.ano))&&(!F.mes||(v.dataSaida||'').slice(5,7)===F.mes)&&(!F.condutor||v.condutor===F.condutor)&&(!F.categoria||v.categoria===F.categoria)&&(!q||`${v.servico} ${v.obs} ${v.condutor}`.toLowerCase().includes(q)))}
+V.diario=()=>{
+ const rows=filtrarViagens().sort((a,b)=>kV(b).localeCompare(kV(a))),ab=viagemAberta();
+ const sel=(k,opts,todos)=>`<select data-filter="${k}" aria-label="${todos}"><option value="">${todos}</option>${opts.map(o=>`<option value="${esc(o[0])}"${F[k]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+ return `<div class="head"><h2>Registo diário</h2><div class="row">
+  <button class="btn" data-act="print-diario">Imprimir</button>
+  ${ab?`<button class="btn primary" data-act="entrada" data-id="${ab.id}">Registar entrada</button>`:`<button class="btn primary" data-act="novo" data-tipo="viagens">Registar saída</button>`}</div></div>
+ <div class="filters">${sel('ano',anos().map(a=>[a,a]),'Todos os anos')}${sel('mes',MESES.map((m,i)=>[pad(i+1),m]),'Todos os meses')}
+  ${sel('condutor',nomesCond().map(n=>[n,n]),'Todos os condutores')}${sel('categoria',S.config.categorias.map(n=>[n,n]),'Todas as categorias')}
+  <input type="search" data-filter="q" placeholder="Procurar no serviço ou observações" value="${esc(F.q)}"></div>
+ ${tabela('viagens',rows,colsViagens(false),[{v:`${rows.length} ${rows.length===1?'saída':'saídas'}`,span:3},{v:fmtDur(sum(rows,minutos)),c:'num'},{v:'',span:2},{v:fmtN(sum(rows,kmFeitos))+' km',c:'num'},{v:'',span:2}])}`;
+};
+
+V.abastecimentos=()=>{
+ const c=S.config,l=abastCalc().reverse(),ys=Object.keys(c.orcamento||{}).sort();
+ return `<div class="head"><h2>Abastecimentos</h2><button class="btn primary" data-act="novo" data-tipo="abastecimentos">Registar abastecimento</button></div>
+ ${ys.length?`<div class="budget">${ys.map(y=>{const g=galp(y);return `<div class="card"><span class="muted">Previsão autorizada ${esc(c.pagamentoOrcamento)} ${y}</span><br>
+  <b>${eur(g.rest)}</b> <span class="muted">restantes de ${eur(g.prev)}</span>
+  <div class="meter"><i class="${g.pct>=1?'bad':g.pct>=.85?'warn':''}" style="width:${Math.min(100,g.pct*100)}%"></i></div></div>`}).join('')}</div>`:''}
+ ${tabela('abastecimentos',l,[
+  {l:'Data',c:'nw',v:a=>fmtD(a.data)},{l:'Km',c:'num',v:a=>fmtN(a.km)},{l:'Litros',c:'num',v:a=>fmtN(a.litros,2)},{l:'Valor',c:'num',v:a=>eur(a.valor)},
+  {l:'Preço/L',c:'num',v:a=>a.litros?fmtN(a.valor/a.litros,3)+' €':'—'},
+  {l:'Desde o anterior',c:'num',v:a=>a.kmDesde!=null?`${fmtN(a.kmDesde)} km<span class="sub">${a.difDias} dias</span>`:'—'},
+  {l:'Consumo estimado',c:'num',v:a=>a.consumo?fmtN(a.consumo,1)+' L/100':'—'},
+  {l:'Fatura',c:'nw',v:a=>esc(a.fatura)},{l:'Pagamento',c:'nw',v:a=>esc(a.pagamento)},{l:'Rubrica',c:'nw',v:a=>esc(a.condutor)}],
+  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:6}])}
+ <p class="muted" style="font-size:.88rem">O consumo estimado divide os litros de cada abastecimento pelos km feitos desde o anterior — é fiável quando se atesta sempre o depósito.</p>`;
+};
+
+V.inspecoes=()=>{
+ const l=[...S.inspecoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+ return `<div class="head"><h2>Inspeções mensais</h2><button class="btn primary" data-act="novo" data-tipo="inspecoes">Registar inspeção</button></div>
+ ${tabela('inspecoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},
+  ...['pneus','luzes','travoes','oleo','liquidos','extintor'].map(k=>({l:SC.inspecoes.campos.find(f=>f.k===k).l,v:r=>estadoB(r[k])})),
+  {l:'Diversos e observações',v:r=>[r.diversos,r.observacoes].filter(Boolean).map(esc).join('<br>')+(r.seguimento?`<span class="sub">Seguimento: ${nl(r.seguimento)}</span>`:'')},
+  {l:'Assinatura',c:'nw',v:r=>esc(r.assinatura)||'<span class="b warn">Por assinar</span>'}])}`;
+};
+
+V.manutencao=()=>{
+ const segs=[['manutencoes','Manutenção e reparações'],['pneus','Pneus'],['regeneracoes','Regenerações DPF']];
+ let body='';
+ if(subMan==='manutencoes'){const l=[...S.manutencoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+  body=tabela('manutencoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Tipo',v:r=>esc(r.tipo)},{l:'Descrição',v:r=>esc(r.descricao)+(r.obs?`<span class="sub">${esc(r.obs)}</span>`:'')},
+   {l:'Fornecedor',v:r=>esc(r.fornecedor)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Custo',c:'num',v:r=>eur(r.custo)}],
+   [{v:`${l.length} registos`,span:5},{v:eur(sum(l,r=>r.custo)),c:'num'}])}
+ else if(subMan==='pneus'){const a=[...S.pneus].sort((x,y)=>kD(x).localeCompare(kD(y)));const l=a.map((r,i)=>({...r,desde:i&&r.km!=null&&a[i-1].km!=null?r.km-a[i-1].km:null})).reverse();
+  body=tabela('pneus',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Km desde a troca anterior',c:'num',v:r=>fmtN(r.desde)},
+   {l:'Oficina',v:r=>esc(r.oficina)},{l:'Observações',v:r=>esc(r.observacoes)},{l:'Rubrica',c:'nw',v:r=>esc(r.condutor)}])+
+   (a.length?`<p class="muted">Desde a última troca: <b>${fmtN(kmAtual()-a[a.length-1].km)} km</b>.</p>`:'')}
+ else{const l=[...S.regeneracoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+  body=tabela('regeneracoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Tipo',v:r=>esc(r.tipo)},
+   {l:'Duração',c:'num',v:r=>r.duracao!=null?r.duracao+' min':'—'},{l:'Resultado',v:r=>r.resultado?`<span class="b ${r.resultado==='Concluída'?'ok':'warn'}">${esc(r.resultado)}</span>`:'—'},{l:'Observações',v:r=>esc(r.obs)}])}
+ return `<div class="head"><h2>Manutenção</h2><button class="btn primary" data-act="novo" data-tipo="${subMan}">Registar ${SC[subMan].nome}</button></div>
+ <div class="seg" role="group">${segs.map(s=>`<button data-act="sub" data-sub="${s[0]}" aria-pressed="${subMan===s[0]}">${s[1]}</button>`).join('')}</div>${body}`;
+};
+
+V.acidentes=()=>{const l=[...S.acidentes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+ return `<div class="head"><h2>Registo de acidentes</h2><button class="btn primary" data-act="novo" data-tipo="acidentes">Registar acidente</button></div>
+ ${tabela('acidentes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)+(r.hora?`<span class="sub">${r.hora}</span>`:'')},{l:'Local',v:r=>esc(r.local)},{l:'Condutor',v:r=>esc(r.condutor)},
+  {l:'Descrição',v:r=>esc(r.descricao)},{l:'Danos',v:r=>esc(r.danos)},{l:'Entidades',v:r=>esc(r.entidades)},{l:'Participação',v:r=>esc(r.participacao)}])}`};
+
+V.condutores=()=>{const h=hoje(),a=S.config.cartaAvisoDias,l=[...S.condutores].sort((x,y)=>x.nome.localeCompare(y.nome,'pt'));
+ return `<div class="head"><h2>Condutores autorizados</h2><button class="btn primary" data-act="novo" data-tipo="condutores">Adicionar condutor</button></div>
+ ${tabela('condutores',l,[{l:'Nome',v:r=>`<b>${esc(r.nome)}</b>`},{l:'Carta de condução',v:r=>esc(r.carta)||'—'},
+  {l:'Validade',c:'nw',v:r=>{if(!r.validade)return '<span class="b mut">Por preencher</span>';const d=dias(h,r.validade);return `${fmtD(r.validade)} ${d<0?'<span class="b bad">Expirada</span>':d<=a?'<span class="b warn">A expirar</span>':''}`}},
+  {l:'Despacho',v:r=>esc(r.despacho)||'—'},{l:'Reboque',v:r=>esc(r.reboque)||'—'},
+  {l:'Saídas',c:'num',v:r=>S.viagens.filter(v=>v.condutor===r.nome).length},{l:'Km conduzidos',c:'num',v:r=>fmtN(sum(S.viagens.filter(v=>v.condutor===r.nome),kmFeitos))}])}`};
+
+V.resumo=()=>{
+ const y=anoRes,vs=S.viagens.filter(v=>(v.dataSaida||'').startsWith(y)),as=S.abastecimentos.filter(a=>(a.data||'').startsWith(y));
+ const m=MESES.map((n,i)=>{const mm=`${y}-${pad(i+1)}`,v=vs.filter(x=>x.dataSaida.startsWith(mm)),a=as.filter(x=>x.data.startsWith(mm));
+  return{n,s:v.length,km:sum(v,kmFeitos),min:sum(v,minutos),l:sum(a,x=>x.litros),e:sum(a,x=>x.valor)}});
+ const mx=Math.max(1,...m.map(x=>x.km)),z=v=>v?v:`<span class="zero">0</span>`;
+ const cats=[...new Set([...S.config.categorias,...vs.map(v=>v.categoria)])].filter(Boolean);
+ const cm=cats.map(c=>({c,m:MESES.map((_,i)=>vs.filter(v=>v.categoria===c&&v.dataSaida.slice(5,7)===pad(i+1)).length)})).filter(r=>r.m.some(Boolean));
+ const cond=nomesCond().map(n=>({n,s:vs.filter(v=>v.condutor===n).length,km:sum(vs.filter(v=>v.condutor===n),kmFeitos)})).filter(x=>x.s);
+ return `<div class="head"><h2>Resumo anual</h2><select class="btn" data-act="ano-res" aria-label="Ano">${anos().map(a=>`<option${a===y?' selected':''}>${a}</option>`).join('')}</select></div>
+ <section><h3 style="margin-bottom:8px">Por mês</h3><div class="card scroll"><table><thead><tr><th>Mês</th><th class="num">Saídas</th><th class="num">Km efetuados</th><th class="num">Tempo em serviço</th><th class="num">Litros</th><th class="num">Combustível</th></tr></thead><tbody>
+ ${m.map(x=>`<tr><td>${x.n}</td><td class="num">${z(x.s)}</td><td class="num"><div class="bar-cell"><i style="width:${x.km/mx*90}px"></i>${x.km?fmtN(x.km):z(0)}</div></td><td class="num">${x.min?fmtDur(x.min):z(0)}</td><td class="num">${x.l?fmtN(x.l,2):z(0)}</td><td class="num">${x.e?eur(x.e):z(0)}</td></tr>`).join('')}
+ </tbody><tfoot><tr><td>Total</td><td class="num">${sum(m,x=>x.s)}</td><td class="num">${fmtN(sum(m,x=>x.km))}</td><td class="num">${fmtDur(sum(m,x=>x.min))}</td><td class="num">${fmtN(sum(m,x=>x.l),2)}</td><td class="num">${eur(sum(m,x=>x.e))}</td></tr></tfoot></table></div></section>
+ <section><h3 style="margin-bottom:8px">Saídas por categoria</h3>${cm.length?`<div class="card scroll"><table><thead><tr><th>Categoria</th>${MES3.map(x=>`<th class="num">${x}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
+ ${cm.map(r=>`<tr><td>${esc(r.c)}</td>${r.m.map(v=>`<td class="num">${v||'<span class="zero">·</span>'}</td>`).join('')}<td class="num"><b>${r.m.reduce((a,b)=>a+b,0)}</b></td></tr>`).join('')}
+ </tbody></table></div>`:'<div class="card empty">Sem saídas neste ano.</div>'}</section>
+ <section><h3 style="margin-bottom:8px">Por condutor</h3>${cond.length?`<div class="card scroll"><table><thead><tr><th>Condutor</th><th class="num">Saídas</th><th class="num">Km</th></tr></thead><tbody>
+ ${cond.map(c=>`<tr><td>${esc(c.n)}</td><td class="num">${c.s}</td><td class="num">${fmtN(c.km)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="card empty">Sem saídas neste ano.</div>'}</section>`;
+};
+
+V.definicoes=()=>{const c=S.config,fb=JSON.parse(localStorage.getItem(LSFB)||'null');
+ return `<h2>Definições</h2>
+ <div class="set"><h3>Viatura</h3><div class="grid">
+  ${campoHTML({k:'marca',l:'Marca'},c.viatura.marca)}${campoHTML({k:'modelo',l:'Modelo'},c.viatura.modelo)}${campoHTML({k:'matricula',l:'Matrícula'},c.viatura.matricula)}</div></div>
+ <div class="set"><h3>Listas e avisos</h3><div class="grid">
+  ${campoHTML({k:'categorias',l:'Categorias de saídas (uma por linha)',t:'textarea',rows:9,w:2},c.categorias.join('\n'))}
+  ${campoHTML({k:'pagamentos',l:'Formas de pagamento (uma por linha)',t:'textarea',rows:4},c.pagamentos.join('\n'))}
+  ${campoHTML({k:'pagamentoOrcamento',l:'Pagamento com orçamento controlado',t:'select',opts:c.pagamentos},c.pagamentoOrcamento)}
+  ${campoHTML({k:'orcamento',l:'Previsão autorizada por ano (ano: valor)',t:'textarea',rows:4},Object.entries(c.orcamento||{}).map(([a,v])=>`${a}: ${v}`).join('\n'))}
+  ${campoHTML({k:'inspecaoDias',l:'Avisar inspeção mensal após (dias)',t:'number',step:1},c.inspecaoDias)}
+  ${campoHTML({k:'cartaAvisoDias',l:'Avisar validade da carta com (dias)',t:'number',step:1},c.cartaAvisoDias)}
+ </div><button class="btn primary" data-act="cfg-save">Guardar definições</button></div>
+ <div class="set"><h3>Sincronização entre equipamentos (Firebase)</h3>
+  <p>Cole a configuração do projeto Firebase (o objeto <code>firebaseConfig</code>) e escolha um código de equipa. Todos os equipamentos com o mesmo código veem os mesmos registos. Os dados ficam na coleção <code>diario_viatura</code>.</p>
+  <div class="grid">${campoHTML({k:'fbcfg',l:'firebaseConfig',t:'textarea',rows:6,full:1},fb?JSON.stringify(fb.config,null,1):'')}
+  ${campoHTML({k:'fbcod',l:'Código de equipa'},fb?fb.codigo:'')}</div>
+  <div class="row"><button class="btn primary" data-act="fb-on">${fb?'Atualizar ligação':'Ligar sincronização'}</button>${fb?'<button class="btn" data-act="fb-off">Desligar neste equipamento</button>':''}</div></div>
+ <div class="set"><h3>Cópias de segurança</h3><p>A cópia JSON guarda tudo e pode ser importada noutro equipamento. O Excel tem uma folha por tipo de registo.</p>
+  <div class="row"><button class="btn" data-act="exp-xlsx">Descarregar Excel</button><button class="btn" data-act="exp-json">Descarregar cópia (JSON)</button><button class="btn" data-act="imp-json">Importar cópia (JSON)</button></div></div>`;
+};
+
+/* ---------- Impressão ---------- */
+function imprimirDiario(){
+ const rows=filtrarViagens().sort((a,b)=>kV(a).localeCompare(kV(b))),v=S.config.viatura;
+ const per=[F.mes?MESES[+F.mes-1]:'',F.ano||'Todos os anos'].filter(Boolean).join(' de ')+(F.condutor?`, ${F.condutor}`:'')+(F.categoria?`, ${F.categoria}`:'');
+ $('#print').innerHTML=`<h1>Registo diário de viatura</h1><div class="ph"><span>Marca: <b>${esc(v.marca)}</b></span><span>Modelo: <b>${esc(v.modelo)}</b></span><span>Matrícula: <b>${esc(fmtMat(v.matricula))}</b></span><span>Período: <b>${esc(per)}</b></span></div>
+ <table><thead><tr><th>Data</th><th>Hora saída</th><th>Hora entrada</th><th>Km saída</th><th>Km entrada</th><th>Km feitos</th><th>Serviço efetuado</th><th>Condutor</th><th style="width:22mm">Rubrica</th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><td>${fmtD(r.dataSaida)}${r.dataEntrada!==r.dataSaida&&r.dataEntrada?' a '+fmtD(r.dataEntrada):''}</td><td>${r.horaSaida}</td><td>${r.horaEntrada||''}</td><td>${fmtN(r.kmSaida)}</td><td>${fmtN(r.kmEntrada)}</td><td>${fmtN(kmFeitos(r))}</td><td>${esc(r.servico)}</td><td>${esc(r.condutor)}</td><td></td></tr>`).join('')}
+ <tr><td colspan="5"><b>Total: ${rows.length} saídas</b></td><td><b>${fmtN(sum(rows,kmFeitos))}</b></td><td colspan="3"></td></tr></tbody></table>
+ <p style="margin-top:14px;font-size:9pt">Impresso a ${fmtD(hoje())}</p>`;
+ window.print();
+}
+
+/* ---------- Exportar / importar ---------- */
+function descarregar(nome,conteudo,tipo){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+const nomeBase=()=>`Diario_Viatura_${(S.config.viatura.matricula||'').replace(/\W/g,'')}_${hoje()}`;
+function exportXlsx(){
+ if(!window.XLSX){toast('O Excel precisa de ligação à internet. Use a cópia JSON.');return}
+ const wb=XLSX.utils.book_new(),add=(n,r)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[{'Sem registos':''}]),n);
+ const asc=(t,k)=>[...S[t]].sort((a,b)=>k(a).localeCompare(k(b)));
+ add('Reg. Diário',asc('viagens',kV).map(v=>({'Data saída':fmtD(v.dataSaida),'Hora saída':v.horaSaida,'Km saída':v.kmSaida,'Data entrada':fmtD(v.dataEntrada),'Hora entrada':v.horaEntrada,'Km entrada':v.kmEntrada,'Km feitos':kmFeitos(v),'Tempo':fmtDur(minutos(v)),'Categoria':v.categoria,'Serviço efetuado':v.servico,'Condutor':v.condutor,'Observações':v.obs})));
+ add('Abastecimentos',abastCalc().map(a=>({'Data':fmtD(a.data),'Km':a.km,'Litros':a.litros,'Valor':a.valor,'N.º Fatura':a.fatura,'Rubrica':a.condutor,'Pagamento':a.pagamento,'Dif. tempo (dias)':a.difDias,'Km feitos':a.kmDesde,'Consumo L/100':a.consumo?+a.consumo.toFixed(1):null,'Observações':a.obs})));
+ add('Pneus',asc('pneus',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Oficina':r.oficina,'Observações':r.observacoes,'Rubrica':r.condutor})));
+ add('Inspeções Mensais',asc('inspecoes',kD).map(r=>({'Data':fmtD(r.data),'Pneus':r.pneus,'Luzes':r.luzes,'Travões':r.travoes,'Óleo':r.oleo,'Líquidos':r.liquidos,'Extintor':r.extintor,'Diversos':r.diversos,'Observações':r.observacoes,'Assinatura':r.assinatura,'Seguimento':r.seguimento})));
+ add('Manutenção e Reparações',asc('manutencoes',kD).map(r=>({'Data':fmtD(r.data),'Tipo de Operação':r.tipo,'Descrição':r.descricao,'Fornecedor':r.fornecedor,'Custo':r.custo,'Km':r.km,'Observações':r.obs})));
+ add('Regenerações',asc('regeneracoes',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Tipo de Regeneração':r.tipo,'Duração (min)':r.duracao,'Resultado':r.resultado,'Observações':r.obs})));
+ add('Lista Condutores',S.condutores.map(r=>({'Nome':r.nome,'Carta Condução':r.carta,'Validade':fmtD(r.validade),'Despacho':r.despacho,'Reboque':r.reboque})));
+ add('Registo Acidentes',asc('acidentes',kD).map(r=>({'Data':fmtD(r.data),'Hora':r.hora,'Local':r.local,'Condutor':r.condutor,'Descrição do Acidente':r.descricao,'Danos':r.danos,'Entidades Envolvidas':r.entidades,'Participação':r.participacao})));
+ XLSX.writeFile(wb,nomeBase()+'.xlsx');
+}
+$('#fileIn').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{const x=JSON.parse(await f.text());if(!x.config||!Array.isArray(x.viagens))throw 0;
+  const n=x.viagens.length;if(!confirm(`Substituir todos os registos atuais pelos da cópia (${n} saídas)?`))return;
+  S=norm(x);saveLocal();if(fb.on)await fbSubstituir(S);render();toast('Cópia importada')}
+ catch(err){alert('O ficheiro não é uma cópia válida do Diário de Viatura.')}};
+
+/* ---------- Firebase ---------- */
+const fb={on:false,col:null,codigo:'',unsub:null,estado:'local',primeira:true};
+const limpo=o=>JSON.parse(JSON.stringify(o));
+function setSync(e,msg){fb.estado=e;const el=$('#hSync');el.className='sync '+({on:'on',err:'err',wait:'wait'}[e]||'');
+ el.querySelector('span').textContent=msg||({local:'Só neste equipamento',wait:'A ligar…',on:'Sincronizado',err:'Erro de sincronização'}[e])}
+function carregarScript(src){return new Promise((ok,ko)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=ko;document.head.appendChild(s)})}
+async function fbIniciar(){
+ const cfg=JSON.parse(localStorage.getItem(LSFB)||'null');if(!cfg)return setSync('local');
+ setSync('wait');
+ try{
+  await carregarScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+  await carregarScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
+  const app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg.config);
+  const db=firebase.firestore(app);
+  try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
+  fb.col=db.collection('diario_viatura');fb.codigo=cfg.codigo;fb.on=true;fb.primeira=true;
+  if(fb.unsub)fb.unsub();
+  fb.unsub=fb.col.where('_codigo','==',fb.codigo).onSnapshot(snap=>{
+   if(fb.primeira){fb.primeira=false;
+    if(snap.empty){if(TIPOS.some(t=>S[t].length)&&confirm('A base de dados partilhada ainda está vazia para este código. Enviar os registos deste equipamento?'))fbSubstituir(S);else fbCfg();setSync('on');return}}
+   const n=vazio();n.config=S.config;
+   snap.forEach(d=>{const x=d.data(),t=x._tipo;delete x._tipo;delete x._codigo;if(t==='config')n.config={...defaultConfig(),...x};else if(n[t])n[t].push(x)});
+   S=norm(n);saveLocal();setSync(snap.metadata.fromCache?'wait':'on',snap.metadata.fromCache?'Sem ligação — a guardar localmente':'');
+   if(!$('#dlg').open)render();
+  },err=>{setSync('err','Erro: '+(err.code||err.message));console.error(err)});
+ }catch(e){console.error(e);setSync('err','Firebase indisponível');fb.on=false}
+}
+const docId=id=>`${fb.codigo}_${id}`.replace(/\//g,'-');
+function fbSet(tipo,r){if(fb.on)fb.col.doc(docId(r.id)).set({...limpo(r),_codigo:fb.codigo,_tipo:tipo}).catch(e=>toast('Erro ao sincronizar: '+e.message))}
+function fbDel(id){if(fb.on)fb.col.doc(docId(id)).delete().catch(e=>toast('Erro ao sincronizar: '+e.message))}
+function fbCfg(){if(fb.on)fb.col.doc(docId('_config')).set({...limpo(S.config),_codigo:fb.codigo,_tipo:'config'}).catch(e=>toast('Erro ao sincronizar: '+e.message))}
+async function fbSubstituir(dados){
+ const ops=[[docId('_config'),{...limpo(dados.config),_codigo:fb.codigo,_tipo:'config'}]];
+ TIPOS.forEach(t=>dados[t].forEach(r=>ops.push([docId(r.id),{...limpo(r),_codigo:fb.codigo,_tipo:t}])));
+ const ids=new Set(ops.map(o=>o[0])),del=[];
+ (await fb.col.where('_codigo','==',fb.codigo).get()).forEach(d=>{if(!ids.has(d.id))del.push(d.ref)});
+ const all=[...del.map(r=>b=>b.delete(r)),...ops.map(([id,v])=>b=>b.set(fb.col.doc(id),v))];
+ for(let i=0;i<all.length;i+=400){const b=fb.col.firestore.batch();all.slice(i,i+400).forEach(f=>f(b));await b.commit()}
+ toast('Registos enviados para a base partilhada');
+}
+
+/* ---------- Eventos ---------- */
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+function render(){
+ const v=S.config.viatura;$('#hMat').textContent=fmtMat(v.matricula)||'—';$('#hVeh').textContent=[v.marca,v.modelo].filter(Boolean).join(' ')||'Viatura';
+ document.title=`Diário de Viatura — ${fmtMat(v.matricula)}`;
+ $('#tabs').innerHTML=TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}"${t[0]===tab?' aria-current="page"':''}>${t[1]}</button>`).join('');
+ $('#view').innerHTML=V[tab]();
+}
+document.addEventListener('click',e=>{
+ const tr=e.target.closest('tr[data-id]');if(tr&&!e.target.closest('button')){abrirForm(tr.dataset.tipo,tr.dataset.id);return}
+ const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;const a=b.dataset.act;
+ if(a==='tab'){tab=b.dataset.tab;history.replaceState(null,'','#'+tab);render();window.scrollTo(0,0);b.scrollIntoView?.({inline:'nearest',block:'nearest'})}
+ else if(a==='novo')abrirForm(b.dataset.tipo);
+ else if(a==='entrada')abrirForm('viagens',b.dataset.id,{dataEntrada:hoje(),horaEntrada:agora()});
+ else if(a==='sub'){subMan=b.dataset.sub;render()}
+ else if(a==='print-diario')imprimirDiario();
+ else if(a==='exp-json')descarregar(nomeBase()+'.json',JSON.stringify(S,null,1),'application/json');
+ else if(a==='imp-json')$('#fileIn').click();
+ else if(a==='exp-xlsx')exportXlsx();
+ else if(a==='cfg-save')guardarCfg();
+ else if(a==='fb-on'){try{const t=$('#f_fbcfg').value,m=t.match(/\{[\s\S]*\}/);if(!m)throw 0;const config=(new Function('return ('+m[0]+')'))();
+   const codigo=$('#f_fbcod').value.trim().replace(/[^\w-]/g,'');if(!config.projectId)throw 0;if(!codigo){alert('Indique um código de equipa (letras, números, - ou _).');return}
+   localStorage.setItem(LSFB,JSON.stringify({config,codigo}));location.reload()}catch(err){alert('A configuração do Firebase não é válida. Cole o objeto firebaseConfig completo, com projectId.')}}
+ else if(a==='fb-off'){if(confirm('Desligar a sincronização neste equipamento? Os registos continuam guardados aqui.')){localStorage.removeItem(LSFB);location.reload()}}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest?.('tr[data-id]');if(tr)abrirForm(tr.dataset.tipo,tr.dataset.id)}});
+document.addEventListener('change',e=>{const f=e.target.dataset.filter;if(f&&f!=='q'){F[f]=e.target.value;render()}if(e.target.dataset.act==='ano-res'){anoRes=e.target.value;render()}});
+document.addEventListener('input',e=>{if(e.target.dataset.filter==='q'){F.q=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector('[data-filter=q]');i.focus();i.setSelectionRange(p,p)}});
+function guardarCfg(){
+ const g=id=>$('#f_'+id).value,lin=s=>s.split('\n').map(x=>x.trim()).filter(Boolean),c=S.config;
+ c.viatura={marca:g('marca').trim(),modelo:g('modelo').trim(),matricula:g('matricula').trim().toUpperCase()};
+ const cats=lin(g('categorias')),pags=lin(g('pagamentos'));if(!cats.length){alert('Indique pelo menos uma categoria.');return}
+ c.categorias=cats;c.pagamentos=pags.length?pags:c.pagamentos;c.pagamentoOrcamento=g('pagamentoOrcamento');
+ const orc={};for(const l of lin(g('orcamento'))){const m=l.match(/^(\d{4})\s*[:=;]\s*([\d.,\s]+)/);if(!m){alert(`Linha de orçamento inválida: "${l}". Use o formato 2026: 1140`);return}orc[m[1]]=Number(m[2].replace(/\s/g,'').replace(',','.'))}
+ c.orcamento=orc;c.inspecaoDias=Number(g('inspecaoDias'))||30;c.cartaAvisoDias=Number(g('cartaAvisoDias'))||60;
+ saveLocal();fbCfg();render();toast('Definições guardadas');
+}
+render();setSync('local');fbIniciar();
+</script>
+</body>
+</html>
