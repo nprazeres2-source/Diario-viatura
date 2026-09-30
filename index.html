@@ -146,6 +146,14 @@ dialog footer .sp{flex:1}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:99;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%)}
 #print{display:none}
+.sigbox{position:relative;background:#fff;border:1px dashed var(--muted);border-radius:8px}
+.sigbox canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
+.sigbox .sigl{position:absolute;left:12px;right:12px;bottom:34px;border-bottom:1px solid #C9CED4;pointer-events:none}
+.sigbox .sigx{position:absolute;left:14px;bottom:38px;color:#9AA3AD;font-size:.8rem;pointer-events:none}
+.sigbox button{position:absolute;top:6px;right:6px;background:#fff;color:#1F2428;border-color:#D7DCE1}
+.sig-img{display:block;height:40px;max-width:150px;object-fit:contain;background:#fff;border-radius:5px;padding:1px 4px}
+td.sigc{width:1%;white-space:nowrap}
+td.svc{min-width:240px}
 
 @media (max-width:760px){
   .hero{grid-template-columns:1fr}
@@ -168,6 +176,7 @@ dialog footer .sp{flex:1}
   #print table{font-size:9.5pt}
   #print th,#print td{border:1px solid #888;padding:4px 6px;color:#000}
   #print th{background:#eee}
+  #print img{height:9mm;max-width:40mm;display:block}
   #print .ph{display:flex;gap:24px;margin:6px 0 12px}
   @page{size:A4 landscape;margin:12mm}
 }
@@ -244,7 +253,8 @@ const SC={
   {k:'servico',l:'Serviço efetuado',t:'textarea',req:1,full:1},
   {t:'sec',l:'Entrada',hint:'Preencher no regresso da viatura'},
   {k:'dataEntrada',l:'Data',t:'date'},{k:'horaEntrada',l:'Hora',t:'time'},{k:'kmEntrada',l:'Km à entrada',t:'number',step:1},
-  {k:'obs',l:'Observações',t:'textarea',full:1}],
+  {k:'obs',l:'Observações',t:'textarea',full:1},
+  {k:'rubrica',l:'Rubrica do condutor',t:'sig'}],
   def:()=>({dataSaida:hoje(),horaSaida:agora(),kmSaida:kmAtual()||null,condutor:pref.condutor||'',categoria:''}),
   validar(r){
    const n=[r.dataEntrada,r.horaEntrada,r.kmEntrada].filter(x=>x!==''&&x!=null).length;
@@ -260,11 +270,11 @@ const SC={
  abastecimentos:{nome:'abastecimento',campos:[
   {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km no abastecimento',t:'number',step:1,req:1},{k:'litros',l:'Litros',t:'number',step:'0.01',req:1},
   {k:'valor',l:'Valor (€)',t:'number',step:'0.01',req:1},{k:'fatura',l:'N.º da fatura'},{k:'pagamento',l:'Pagamento',t:'select',opts:()=>S.config.pagamentos},
-  {k:'condutor',l:'Rubrica',list:'dl-cond'},{k:'obs',l:'Observações',w:2}],
+  {k:'condutor',l:'Condutor',list:'dl-cond'},{k:'obs',l:'Observações',w:2},{k:'rubrica',l:'Rubrica',t:'sig'}],
   def:()=>({data:hoje(),km:kmAtual()||null,condutor:pref.condutor||'',pagamento:S.config.pagamentoOrcamento||''})},
  pneus:{nome:'substituição de pneus',campos:[
   {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km',t:'number',step:1,req:1},{k:'oficina',l:'Oficina'},
-  {k:'observacoes',l:'Observações',t:'textarea',full:1},{k:'condutor',l:'Rubrica',list:'dl-cond'}],
+  {k:'observacoes',l:'Observações',t:'textarea',full:1},{k:'condutor',l:'Nome',list:'dl-cond'},{k:'rubrica',l:'Rubrica',t:'sig'}],
   def:()=>({data:hoje(),km:kmAtual()||null})},
  inspecoes:{nome:'inspeção mensal',campos:[
   {k:'data',l:'Data',t:'date',req:1},
@@ -272,7 +282,7 @@ const SC={
   {k:'travoes',l:'Travões',t:'select',opts:ESTADOS,req:1},{k:'oleo',l:'Óleo',t:'select',opts:ESTADOS,req:1},
   {k:'liquidos',l:'Líquidos',t:'select',opts:ESTADOS,req:1},{k:'extintor',l:'Extintor',t:'select',opts:ESTADOS,req:1},
   {k:'diversos',l:'Diversos',t:'textarea',full:1},{k:'observacoes',l:'Observações',t:'textarea',full:1},
-  {k:'assinatura',l:'Assinatura (nome)',list:'dl-cond',w:2},
+  {k:'assinatura',l:'Verificado por (nome)',list:'dl-cond',w:2},{k:'rubrica',l:'Assinatura',t:'sig'},
   {k:'seguimento',l:'Seguimento da situação',t:'textarea',rows:3,full:1,hint:'Contactos, pedidos e resolução — pode ir acrescentando linhas com a data.'}],
   def:()=>({data:hoje(),pneus:'OK',luzes:'OK',travoes:'OK',oleo:'OK',liquidos:'OK',extintor:'OK',assinatura:pref.condutor||''})},
  manutencoes:{nome:'manutenção / reparação',campos:[
@@ -300,6 +310,7 @@ const SC={
 /* ---------- Formulário genérico ---------- */
 function campoHTML(f,val){
  if(f.t==='sec')return `<h3 class="sec full">${f.l}${f.hint?` <small class="muted" style="font:400 .85rem var(--f)">— ${f.hint}</small>`:''}</h3>`;
+ if(f.t==='sig')return `<div class="fld full"><span>${f.l}</span><div class="sigbox"><canvas data-sig="${f.k}" aria-label="Área para assinar com o dedo ou caneta"></canvas><i class="sigl"></i><span class="sigx">Assine aqui</span><button type="button" class="btn sm" data-sigclear="${f.k}">Limpar</button></div><input type="hidden" name="${f.k}" value="${esc(val||'')}"></div>`;
  const id='f_'+f.k,req=f.req?' required':'',v=val??'';let inp;
  if(f.t==='select'){const opts=typeof f.opts==='function'?f.opts():f.opts;const list=[...opts];if(v!==''&&!list.includes(v))list.unshift(v);
   inp=`<select id="${id}" name="${f.k}"${req}><option value=""${v===''?' selected':''}>—</option>${list.map(o=>`<option${o===v?' selected':''}>${esc(o)}</option>`).join('')}</select>`}
@@ -322,14 +333,54 @@ function abrirForm(tipo,id,preset={}){
   e.preventDefault();
   if(!frm.reportValidity())return;
   const r={...(ex||{}),id:ex?ex.id:uid()};
-  sc.campos.forEach(f=>{if(f.t==='sec')return;const v=frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
+  sc.campos.forEach(f=>{if(f.t==='sec')return;const v=f.t==='sig'?frm.elements[f.k].value:frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
   const err=sc.validar&&sc.validar(r);if(err){alert(err);return}
   const w=sc.aviso&&sc.aviso(r);if(w&&!confirm(w))return;
   guardar(tipo,r);sc.depois&&sc.depois(r);$('#dlg').close();render();toast('Registo guardado');
  };
  $('#dlg').showModal();
+ iniciarPads(frm);
  const foco=preset.dataEntrada?frm.elements.kmEntrada:frm.querySelector('input,select,textarea');
  if(foco&&!matchMedia('(pointer:coarse)').matches)foco.focus();
+}
+function iniciarPads(frm){
+ frm.querySelectorAll('canvas[data-sig]').forEach(cv=>{
+  const k=cv.dataset.sig,inp=frm.elements[k],dpr=Math.min(2,window.devicePixelRatio||1),box=cv.parentNode;
+  cv.width=cv.clientWidth*dpr;cv.height=cv.clientHeight*dpr;
+  const ctx=cv.getContext('2d');ctx.lineWidth=2.4*dpr;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#1B2F7A';
+  const hint=box.querySelector('.sigx');let desenho=false,last=null;
+  const vazio=()=>{hint.style.display=inp.value?'none':''};
+  if(inp.value){const im=new Image();im.onload=()=>{const s=Math.min(cv.width/im.width,cv.height/im.height);ctx.drawImage(im,(cv.width-im.width*s)/2,(cv.height-im.height*s)/2,im.width*s,im.height*s)};im.src=inp.value}
+  vazio();
+  const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*dpr,(e.clientY-r.top)*dpr]};
+  cv.onpointerdown=e=>{desenho=true;last=pt(e);cv.setPointerCapture(e.pointerId);ctx.beginPath();ctx.arc(last[0],last[1],ctx.lineWidth/2,0,7);ctx.fillStyle=ctx.strokeStyle;ctx.fill();hint.style.display='none'};
+  cv.onpointermove=e=>{if(!desenho)return;const p=pt(e);ctx.beginPath();ctx.moveTo(last[0],last[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();last=p};
+  cv.onpointerup=cv.onpointercancel=()=>{if(!desenho)return;desenho=false;inp.value=exportarAssinatura(cv)};
+  box.querySelector('[data-sigclear]').onclick=()=>{ctx.clearRect(0,0,cv.width,cv.height);inp.value='';vazio()};
+ });
+}
+function exportarAssinatura(cv){
+ const d=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;let x0=cv.width,y0=cv.height,x1=-1,y1=-1;
+ for(let y=0;y<cv.height;y+=2)for(let x=0;x<cv.width;x+=2)if(d[(y*cv.width+x)*4+3]>20){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+ if(x1<0)return '';
+ const m=10;x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(cv.width,x1+m);y1=Math.min(cv.height,y1+m);
+ const w=x1-x0,h=y1-y0,s=Math.min(1,360/w,140/h),o=document.createElement('canvas');o.width=Math.round(w*s);o.height=Math.round(h*s);
+ o.getContext('2d').drawImage(cv,x0,y0,w,h,0,0,o.width,o.height);return o.toDataURL('image/png');
+}
+const sigCel=(tipo,r)=>r.rubrica?`<img class="sig-img" src="${r.rubrica}" alt="Rubrica">`:`<button class="btn sm" data-act="rubricar" data-tipo="${tipo}" data-id="${r.id}">Rubricar</button>`;
+function abrirRubrica(tipo,id){
+ const r=S[tipo].find(x=>x.id===id);if(!r)return;
+ const nomeK=tipo==='inspecoes'?'assinatura':'condutor',frm=$('#frm');
+ const desc=tipo==='viagens'?`${fmtD(r.dataSaida)} — ${esc(r.servico)}`:`${fmtD(r.data)} — ${SC[tipo].nome}`;
+ $('#dl-cond').innerHTML=nomesCond().map(n=>`<option value="${esc(n)}">`).join('');
+ frm.innerHTML=`<header><h2>Rubricar registo</h2><p class="muted" style="margin:.2rem 0 0">${desc}</p></header>
+  <div class="grid">${campoHTML({k:nomeK,l:'Nome',list:'dl-cond',req:1,full:1},r[nomeK])}${campoHTML({k:'rubrica',l:'Rubrica',t:'sig'},r.rubrica)}</div>
+  <footer><span class="sp"></span><button type="button" class="btn" id="fCancel">Cancelar</button><button type="submit" class="btn primary">Guardar rubrica</button></footer>`;
+ $('#fCancel').onclick=()=>$('#dlg').close();
+ frm.onsubmit=e=>{e.preventDefault();if(!frm.reportValidity())return;
+  if(!frm.elements.rubrica.value){alert('Faça a rubrica na área indicada antes de guardar.');return}
+  guardar(tipo,{...r,[nomeK]:frm.elements[nomeK].value.trim(),rubrica:frm.elements.rubrica.value});$('#dlg').close();render();toast('Rubrica guardada')};
+ $('#dlg').showModal();iniciarPads(frm);
 }
 function guardar(tipo,r){const i=S[tipo].findIndex(x=>x.id===r.id);if(i>=0)S[tipo][i]=r;else S[tipo].push(r);saveLocal();fbSet(tipo,r)}
 function remover(tipo,id){S[tipo]=S[tipo].filter(x=>x.id!==id);saveLocal();fbDel(id)}
@@ -405,8 +456,8 @@ function colsViagens(curto){
   {l:'Tempo',c:'num',v:v=>fmtDur(minutos(v))}];
  if(!curto)c.push({l:'Km saída',c:'num',v:v=>fmtN(v.kmSaida)},{l:'Km entrada',c:'num',v:v=>fmtN(v.kmEntrada)});
  c.push({l:'Km feitos',c:'num',v:v=>`<b>${fmtN(kmFeitos(v))}</b>`},
-  {l:'Serviço efetuado',v:v=>`${esc(v.servico)}<span class="sub">${esc(v.categoria)}${v.obs?' — '+esc(v.obs.slice(0,80))+(v.obs.length>80?'…':''):''}</span>`},
-  {l:'Condutor',c:'nw',v:v=>esc(v.condutor)});
+  {l:'Serviço efetuado',c:'svc',v:v=>`${esc(v.servico)}<span class="sub">${esc(v.categoria)}${v.obs?' — '+esc(v.obs.slice(0,80))+(v.obs.length>80?'…':''):''}</span>`},
+  {l:'Condutor',c:'nw',v:v=>esc(v.condutor)},{l:'Rubrica',c:'sigc',v:v=>sigCel('viagens',v)});
  return c;
 }
 function filtrarViagens(){const q=F.q.toLowerCase();return S.viagens.filter(v=>(!F.ano||(v.dataSaida||'').startsWith(F.ano))&&(!F.mes||(v.dataSaida||'').slice(5,7)===F.mes)&&(!F.condutor||v.condutor===F.condutor)&&(!F.categoria||v.categoria===F.categoria)&&(!q||`${v.servico} ${v.obs} ${v.condutor}`.toLowerCase().includes(q)))}
@@ -419,7 +470,7 @@ V.diario=()=>{
  <div class="filters">${sel('ano',anos().map(a=>[a,a]),'Todos os anos')}${sel('mes',MESES.map((m,i)=>[pad(i+1),m]),'Todos os meses')}
   ${sel('condutor',nomesCond().map(n=>[n,n]),'Todos os condutores')}${sel('categoria',S.config.categorias.map(n=>[n,n]),'Todas as categorias')}
   <input type="search" data-filter="q" placeholder="Procurar no serviço ou observações" value="${esc(F.q)}"></div>
- ${tabela('viagens',rows,colsViagens(false),[{v:`${rows.length} ${rows.length===1?'saída':'saídas'}`,span:3},{v:fmtDur(sum(rows,minutos)),c:'num'},{v:'',span:2},{v:fmtN(sum(rows,kmFeitos))+' km',c:'num'},{v:'',span:2}])}`;
+ ${tabela('viagens',rows,colsViagens(false),[{v:`${rows.length} ${rows.length===1?'saída':'saídas'}`,span:3},{v:fmtDur(sum(rows,minutos)),c:'num'},{v:'',span:2},{v:fmtN(sum(rows,kmFeitos))+' km',c:'num'},{v:'',span:3}])}`;
 };
 
 V.abastecimentos=()=>{
@@ -433,8 +484,8 @@ V.abastecimentos=()=>{
   {l:'Preço/L',c:'num',v:a=>a.litros?fmtN(a.valor/a.litros,3)+' €':'—'},
   {l:'Desde o anterior',c:'num',v:a=>a.kmDesde!=null?`${fmtN(a.kmDesde)} km<span class="sub">${a.difDias} dias</span>`:'—'},
   {l:'Consumo estimado',c:'num',v:a=>a.consumo?fmtN(a.consumo,1)+' L/100':'—'},
-  {l:'Fatura',c:'nw',v:a=>esc(a.fatura)},{l:'Pagamento',c:'nw',v:a=>esc(a.pagamento)},{l:'Rubrica',c:'nw',v:a=>esc(a.condutor)}],
-  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:6}])}
+  {l:'Fatura',c:'nw',v:a=>esc(a.fatura)},{l:'Pagamento',c:'nw',v:a=>esc(a.pagamento)},{l:'Condutor',c:'nw',v:a=>esc(a.condutor)},{l:'Rubrica',c:'sigc',v:a=>sigCel('abastecimentos',a)}],
+  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:7}])}
  <p class="muted" style="font-size:.88rem">O consumo estimado divide os litros de cada abastecimento pelos km feitos desde o anterior — é fiável quando se atesta sempre o depósito.</p>`;
 };
 
@@ -444,7 +495,7 @@ V.inspecoes=()=>{
  ${tabela('inspecoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},
   ...['pneus','luzes','travoes','oleo','liquidos','extintor'].map(k=>({l:SC.inspecoes.campos.find(f=>f.k===k).l,v:r=>estadoB(r[k])})),
   {l:'Diversos e observações',v:r=>[r.diversos,r.observacoes].filter(Boolean).map(esc).join('<br>')+(r.seguimento?`<span class="sub">Seguimento: ${nl(r.seguimento)}</span>`:'')},
-  {l:'Assinatura',c:'nw',v:r=>esc(r.assinatura)||'<span class="b warn">Por assinar</span>'}])}`;
+  {l:'Verificado por',c:'nw',v:r=>esc(r.assinatura)||'—'},{l:'Assinatura',c:'sigc',v:r=>sigCel('inspecoes',r)}])}`;
 };
 
 V.manutencao=()=>{
@@ -456,7 +507,7 @@ V.manutencao=()=>{
    [{v:`${l.length} registos`,span:5},{v:eur(sum(l,r=>r.custo)),c:'num'}])}
  else if(subMan==='pneus'){const a=[...S.pneus].sort((x,y)=>kD(x).localeCompare(kD(y)));const l=a.map((r,i)=>({...r,desde:i&&r.km!=null&&a[i-1].km!=null?r.km-a[i-1].km:null})).reverse();
   body=tabela('pneus',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Km desde a troca anterior',c:'num',v:r=>fmtN(r.desde)},
-   {l:'Oficina',v:r=>esc(r.oficina)},{l:'Observações',v:r=>esc(r.observacoes)},{l:'Rubrica',c:'nw',v:r=>esc(r.condutor)}])+
+   {l:'Oficina',v:r=>esc(r.oficina)},{l:'Observações',v:r=>esc(r.observacoes)},{l:'Nome',c:'nw',v:r=>esc(r.condutor)},{l:'Rubrica',c:'sigc',v:r=>sigCel('pneus',r)}])+
    (a.length?`<p class="muted">Desde a última troca: <b>${fmtN(kmAtual()-a[a.length-1].km)} km</b>.</p>`:'')}
  else{const l=[...S.regeneracoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
   body=tabela('regeneracoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Tipo',v:r=>esc(r.tipo)},
@@ -522,8 +573,8 @@ function imprimirDiario(){
  const rows=filtrarViagens().sort((a,b)=>kV(a).localeCompare(kV(b))),v=S.config.viatura;
  const per=[F.mes?MESES[+F.mes-1]:'',F.ano||'Todos os anos'].filter(Boolean).join(' de ')+(F.condutor?`, ${F.condutor}`:'')+(F.categoria?`, ${F.categoria}`:'');
  $('#print').innerHTML=`<h1>Registo diário de viatura</h1><div class="ph"><span>Marca: <b>${esc(v.marca)}</b></span><span>Modelo: <b>${esc(v.modelo)}</b></span><span>Matrícula: <b>${esc(fmtMat(v.matricula))}</b></span><span>Período: <b>${esc(per)}</b></span></div>
- <table><thead><tr><th>Data</th><th>Hora saída</th><th>Hora entrada</th><th>Km saída</th><th>Km entrada</th><th>Km feitos</th><th>Serviço efetuado</th><th>Condutor</th><th style="width:22mm">Rubrica</th></tr></thead><tbody>
- ${rows.map(r=>`<tr><td>${fmtD(r.dataSaida)}${r.dataEntrada!==r.dataSaida&&r.dataEntrada?' a '+fmtD(r.dataEntrada):''}</td><td>${r.horaSaida}</td><td>${r.horaEntrada||''}</td><td>${fmtN(r.kmSaida)}</td><td>${fmtN(r.kmEntrada)}</td><td>${fmtN(kmFeitos(r))}</td><td>${esc(r.servico)}</td><td>${esc(r.condutor)}</td><td></td></tr>`).join('')}
+ <table><thead><tr><th>Data</th><th>Hora saída</th><th>Hora entrada</th><th>Km saída</th><th>Km entrada</th><th>Km feitos</th><th>Serviço efetuado</th><th>Condutor</th><th style="width:42mm">Rubrica</th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><td>${fmtD(r.dataSaida)}${r.dataEntrada!==r.dataSaida&&r.dataEntrada?' a '+fmtD(r.dataEntrada):''}</td><td>${r.horaSaida}</td><td>${r.horaEntrada||''}</td><td>${fmtN(r.kmSaida)}</td><td>${fmtN(r.kmEntrada)}</td><td>${fmtN(kmFeitos(r))}</td><td>${esc(r.servico)}</td><td>${esc(r.condutor)}</td><td>${r.rubrica?`<img src="${r.rubrica}" alt="">`:''}</td></tr>`).join('')}
  <tr><td colspan="5"><b>Total: ${rows.length} saídas</b></td><td><b>${fmtN(sum(rows,kmFeitos))}</b></td><td colspan="3"></td></tr></tbody></table>
  <p style="margin-top:14px;font-size:9pt">Impresso a ${fmtD(hoje())}</p>`;
  window.print();
@@ -536,10 +587,10 @@ function exportXlsx(){
  if(!window.XLSX){toast('O Excel precisa de ligação à internet. Use a cópia JSON.');return}
  const wb=XLSX.utils.book_new(),add=(n,r)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[{'Sem registos':''}]),n);
  const asc=(t,k)=>[...S[t]].sort((a,b)=>k(a).localeCompare(k(b)));
- add('Reg. Diário',asc('viagens',kV).map(v=>({'Data saída':fmtD(v.dataSaida),'Hora saída':v.horaSaida,'Km saída':v.kmSaida,'Data entrada':fmtD(v.dataEntrada),'Hora entrada':v.horaEntrada,'Km entrada':v.kmEntrada,'Km feitos':kmFeitos(v),'Tempo':fmtDur(minutos(v)),'Categoria':v.categoria,'Serviço efetuado':v.servico,'Condutor':v.condutor,'Observações':v.obs})));
- add('Abastecimentos',abastCalc().map(a=>({'Data':fmtD(a.data),'Km':a.km,'Litros':a.litros,'Valor':a.valor,'N.º Fatura':a.fatura,'Rubrica':a.condutor,'Pagamento':a.pagamento,'Dif. tempo (dias)':a.difDias,'Km feitos':a.kmDesde,'Consumo L/100':a.consumo?+a.consumo.toFixed(1):null,'Observações':a.obs})));
- add('Pneus',asc('pneus',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Oficina':r.oficina,'Observações':r.observacoes,'Rubrica':r.condutor})));
- add('Inspeções Mensais',asc('inspecoes',kD).map(r=>({'Data':fmtD(r.data),'Pneus':r.pneus,'Luzes':r.luzes,'Travões':r.travoes,'Óleo':r.oleo,'Líquidos':r.liquidos,'Extintor':r.extintor,'Diversos':r.diversos,'Observações':r.observacoes,'Assinatura':r.assinatura,'Seguimento':r.seguimento})));
+ add('Reg. Diário',asc('viagens',kV).map(v=>({'Data saída':fmtD(v.dataSaida),'Hora saída':v.horaSaida,'Km saída':v.kmSaida,'Data entrada':fmtD(v.dataEntrada),'Hora entrada':v.horaEntrada,'Km entrada':v.kmEntrada,'Km feitos':kmFeitos(v),'Tempo':fmtDur(minutos(v)),'Categoria':v.categoria,'Serviço efetuado':v.servico,'Condutor':v.condutor,'Rubricado':v.rubrica?'Sim':'Não','Observações':v.obs})));
+ add('Abastecimentos',abastCalc().map(a=>({'Data':fmtD(a.data),'Km':a.km,'Litros':a.litros,'Valor':a.valor,'N.º Fatura':a.fatura,'Condutor':a.condutor,'Rubricado':a.rubrica?'Sim':'Não','Pagamento':a.pagamento,'Dif. tempo (dias)':a.difDias,'Km feitos':a.kmDesde,'Consumo L/100':a.consumo?+a.consumo.toFixed(1):null,'Observações':a.obs})));
+ add('Pneus',asc('pneus',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Oficina':r.oficina,'Observações':r.observacoes,'Nome':r.condutor,'Rubricado':r.rubrica?'Sim':'Não'})));
+ add('Inspeções Mensais',asc('inspecoes',kD).map(r=>({'Data':fmtD(r.data),'Pneus':r.pneus,'Luzes':r.luzes,'Travões':r.travoes,'Óleo':r.oleo,'Líquidos':r.liquidos,'Extintor':r.extintor,'Diversos':r.diversos,'Observações':r.observacoes,'Verificado por':r.assinatura,'Assinado':r.rubrica?'Sim':'Não','Seguimento':r.seguimento})));
  add('Manutenção e Reparações',asc('manutencoes',kD).map(r=>({'Data':fmtD(r.data),'Tipo de Operação':r.tipo,'Descrição':r.descricao,'Fornecedor':r.fornecedor,'Custo':r.custo,'Km':r.km,'Observações':r.obs})));
  add('Regenerações',asc('regeneracoes',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Tipo de Regeneração':r.tipo,'Duração (min)':r.duracao,'Resultado':r.resultado,'Observações':r.obs})));
  add('Lista Condutores',S.condutores.map(r=>({'Nome':r.nome,'Carta Condução':r.carta,'Validade':fmtD(r.validade),'Despacho':r.despacho,'Reboque':r.reboque})));
@@ -606,6 +657,7 @@ document.addEventListener('click',e=>{
  const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;const a=b.dataset.act;
  if(a==='tab'){tab=b.dataset.tab;history.replaceState(null,'','#'+tab);render();window.scrollTo(0,0);b.scrollIntoView?.({inline:'nearest',block:'nearest'})}
  else if(a==='novo')abrirForm(b.dataset.tipo);
+ else if(a==='rubricar')abrirRubrica(b.dataset.tipo,b.dataset.id);
  else if(a==='entrada')abrirForm('viagens',b.dataset.id,{dataEntrada:hoje(),horaEntrada:agora()});
  else if(a==='sub'){subMan=b.dataset.sub;render()}
  else if(a==='print-diario')imprimirDiario();
