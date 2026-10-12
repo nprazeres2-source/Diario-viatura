@@ -565,7 +565,9 @@ V.definicoes=()=>{const c=S.config,fb=fbGuardado();
   <p>Cole a configuração do projeto Firebase (o objeto <code>firebaseConfig</code>) e escolha um código de equipa. Todos os equipamentos com o mesmo código veem os mesmos registos. Os dados ficam na coleção <code>diario_viatura</code>.</p>
   <div class="grid">${campoHTML({k:'fbcfg',l:'firebaseConfig',t:'textarea',rows:6,full:1},fb?JSON.stringify(fb.config,null,1):'')}
   ${campoHTML({k:'fbcod',l:'Código de equipa'},fb?fb.codigo:'')}</div>
-  <div class="row"><button class="btn primary" data-act="fb-on">${fb?'Atualizar ligação':'Ligar sincronização'}</button>${fb?'<button class="btn" data-act="fb-off">Desligar neste equipamento</button>':''}</div></div>
+  <div class="row"><button class="btn primary" data-act="fb-on">${fb?'Atualizar ligação':'Ligar sincronização'}</button>${fb?'<button class="btn" data-act="fb-off">Desligar neste equipamento</button>':''}</div>
+  ${fb?`<p style="margin-top:14px">Se outro equipamento não mostra registos, envie a partir daqui os registos deste equipamento (${TIPOS.reduce((s,t)=>s+S[t].length,0)} registos). Os que estiverem na base partilhada são substituídos.</p>
+  <div class="row"><button class="btn" data-act="fb-push">Enviar registos deste equipamento</button>${SEED?'<button class="btn" data-act="seed">Repor registos originais do Excel</button>':''}</div>`:''}</div>
  <div class="set"><h3>Cópias de segurança</h3><p>A cópia JSON guarda tudo e pode ser importada noutro equipamento. O Excel tem uma folha por tipo de registo.</p>
   <div class="row"><button class="btn" data-act="exp-xlsx">Descarregar Excel</button><button class="btn" data-act="exp-json">Descarregar cópia (JSON)</button><button class="btn" data-act="imp-json">Importar cópia (JSON)</button></div></div>`;
 };
@@ -628,12 +630,16 @@ async function fbIniciar(){
    if(fb.primeira){
     if(cache){if(snap.empty){setSync('wait','A ligar ao servidor…');return}}
     else{fb.primeira=false;
-     if(snap.empty){setSync('on');if(TIPOS.some(t=>S[t].length)&&confirm('A base de dados partilhada ainda está vazia para este código. Enviar os registos deste equipamento?'))fbSubstituir(S);else fbCfg();return}}
+     const nReg=snap.docs.filter(d=>d.get('_tipo')!=='config').length,nLoc=TIPOS.reduce((s,t)=>s+S[t].length,0);
+     if(nReg===0){setSync('on');
+      if(nLoc&&confirm(`A base partilhada ainda não tem registos. Enviar os ${nLoc} registos deste equipamento?`))fbSubstituir(S);
+      else if(snap.empty)fbCfg();
+      render();return}}
    }
    if(!snap.metadata.hasPendingWrites||!cache){
     const n=vazio();n.config=S.config;
     snap.forEach(d=>{const x=d.data(),t=x._tipo;delete x._tipo;delete x._codigo;if(t==='config')n.config={...defaultConfig(),...x};else if(n[t])n[t].push(x)});
-    if(!snap.empty){S=norm(n);saveLocal();if(!$('#dlg').open)render()}
+    if(TIPOS.some(t=>n[t].length)||fb.vazioOk){S=norm(n);saveLocal();if(!$('#dlg').open)render()}
    }
    if(cache)setSync('wait',navigator.onLine===false?'Sem internet — a guardar localmente':'A ligar ao servidor…');
    else setSync('on');
@@ -679,6 +685,11 @@ document.addEventListener('click',e=>{
  else if(a==='imp-json')$('#fileIn').click();
  else if(a==='exp-xlsx')exportXlsx();
  else if(a==='cfg-save')guardarCfg();
+ else if(a==='fb-push'){const n=TIPOS.reduce((s,t)=>s+S[t].length,0);if(!fb.on){alert('A sincronização não está ligada.');return}
+  if(confirm(`Enviar os ${n} registos deste equipamento para a base partilhada? Os registos que lá estão serão substituídos por estes.`))fbSubstituir(S).catch(e=>alert('Erro ao enviar: '+(e.code||e.message)))}
+ else if(a==='seed'){if(!confirm('Repor os registos originais importados do Excel neste equipamento? As alterações feitas depois (incluindo rubricas) perdem-se neste equipamento.'))return;
+  S=norm(JSON.parse(JSON.stringify(SEED)));saveLocal();render();toast('Registos originais repostos');
+  if(fb.on&&confirm('Enviar também estes registos para a base partilhada?'))fbSubstituir(S).catch(e=>alert('Erro ao enviar: '+(e.code||e.message)))}
  else if(a==='fb-on'){try{const t=$('#f_fbcfg').value,m=t.match(/\{[\s\S]*\}/);if(!m)throw 0;const config=(new Function('return ('+m[0]+')'))();
    const codigo=$('#f_fbcod').value.trim().replace(/[^\w-]/g,'');if(!config.projectId)throw 0;if(!codigo){alert('Indique um código de equipa (letras, números, - ou _).');return}
    localStorage.setItem(LSFB,JSON.stringify({config,codigo}));location.reload()}catch(err){alert('A configuração do Firebase não é válida. Cole o objeto firebaseConfig completo, com projectId.')}}
