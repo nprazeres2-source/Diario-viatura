@@ -622,14 +622,26 @@ async function fbIniciar(){
   try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
   fb.col=db.collection('diario_viatura');fb.codigo=cfg.codigo;fb.on=true;fb.primeira=true;
   if(fb.unsub)fb.unsub();
-  fb.unsub=fb.col.where('_codigo','==',fb.codigo).onSnapshot(snap=>{
-   if(fb.primeira){fb.primeira=false;
-    if(snap.empty){if(TIPOS.some(t=>S[t].length)&&confirm('A base de dados partilhada ainda está vazia para este código. Enviar os registos deste equipamento?'))fbSubstituir(S);else fbCfg();setSync('on');return}}
-   const n=vazio();n.config=S.config;
-   snap.forEach(d=>{const x=d.data(),t=x._tipo;delete x._tipo;delete x._codigo;if(t==='config')n.config={...defaultConfig(),...x};else if(n[t])n[t].push(x)});
-   S=norm(n);saveLocal();setSync(snap.metadata.fromCache?'wait':'on',snap.metadata.fromCache?'Sem ligação — a guardar localmente':'');
-   if(!$('#dlg').open)render();
+  const q=fb.col.where('_codigo','==',fb.codigo);
+  fb.unsub=q.onSnapshot({includeMetadataChanges:true},snap=>{
+   const cache=snap.metadata.fromCache;
+   if(fb.primeira){
+    if(cache){if(snap.empty){setSync('wait','A ligar ao servidor…');return}}
+    else{fb.primeira=false;
+     if(snap.empty){setSync('on');if(TIPOS.some(t=>S[t].length)&&confirm('A base de dados partilhada ainda está vazia para este código. Enviar os registos deste equipamento?'))fbSubstituir(S);else fbCfg();return}}
+   }
+   if(!snap.metadata.hasPendingWrites||!cache){
+    const n=vazio();n.config=S.config;
+    snap.forEach(d=>{const x=d.data(),t=x._tipo;delete x._tipo;delete x._codigo;if(t==='config')n.config={...defaultConfig(),...x};else if(n[t])n[t].push(x)});
+    if(!snap.empty){S=norm(n);saveLocal();if(!$('#dlg').open)render()}
+   }
+   if(cache)setSync('wait',navigator.onLine===false?'Sem internet — a guardar localmente':'A ligar ao servidor…');
+   else setSync('on');
   },err=>{setSync('err','Erro: '+(err.code||err.message));console.error(err)});
+  // Diagnóstico: se o servidor não responder, mostrar o motivo real
+  setTimeout(()=>{if(fb.estado!=='wait')return;
+   q.limit(1).get({source:'server'}).then(()=>{if(fb.estado==='wait')setSync('on')})
+    .catch(err=>{console.error(err);setSync('err',err.code==='permission-denied'?'Sem permissão — verifique as regras do Firestore':err.code==='unavailable'?'Servidor inacessível — verifique a internet ou se a base Firestore existe':'Erro: '+(err.code||err.message))})},8000);
  }catch(e){console.error(e);setSync('err','Firebase indisponível');fb.on=false}
 }
 const docId=id=>`${fb.codigo}_${id}`.replace(/\//g,'-');
