@@ -146,6 +146,12 @@ dialog footer .sp{flex:1}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:99;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%)}
 #print{display:none}
+.segs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:10px}
+.segc{padding:18px}
+.segh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.segc dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0 0 16px}
+.segc dt{color:var(--muted);font-size:.84rem}.segc dd{margin:0}
+.segc .mat{font:700 1.2rem var(--fc);letter-spacing:.04em}
 .sigbox{position:relative;background:#fff;border:1px dashed var(--muted);border-radius:8px}
 .sigbox canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
 .sigbox .sigl{position:absolute;left:12px;right:12px;bottom:34px;border-bottom:1px solid #C9CED4;pointer-events:none}
@@ -205,7 +211,7 @@ const SEED = {"config": {"viatura": {"marca": "Toyota", "modelo": "Hilux", "matr
 const FB_PADRAO={codigo:'viatura-ca13is',config:{apiKey:"AIzaSyCkScMiuaBwoT9BGF43jOUaL6nNDogYLZk",authDomain:"equip-campo.firebaseapp.com",projectId:"equip-campo",storageBucket:"equip-campo.firebasestorage.app",messagingSenderId:"997079796847",appId:"1:997079796847:web:ca89dfc4f662ed08bdd19a",measurementId:"G-XW8XRKEWHE"}};
 function fbGuardado(){const s=localStorage.getItem('diarioViatura_fb');if(s==='"off"')return null;try{return s?JSON.parse(s):FB_PADRAO}catch(e){return FB_PADRAO}}
 const LS='diarioViatura_v1', LSFB='diarioViatura_fb', LSP='diarioViatura_pref';
-const TIPOS=['viagens','abastecimentos','pneus','inspecoes','manutencoes','regeneracoes','condutores','acidentes'];
+const TIPOS=['viagens','abastecimentos','pneus','inspecoes','manutencoes','regeneracoes','condutores','acidentes','seguros'];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MES3=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const ESTADOS=['OK','Não conforme','Não tem'];
@@ -223,7 +229,7 @@ const dias=(a,b)=>Math.round((Date.parse(b)-Date.parse(a))/864e5);
 const sum=(arr,f)=>arr.reduce((s,x)=>s+(Number(f(x))||0),0);
 const nl=s=>esc(s).replace(/\n/g,'<br>');
 
-function fmtMat(m){m=(m||'').toUpperCase().replace(/[\s-]/g,'');return /^[A-Z0-9]{6}$/.test(m)?m.match(/../g).join('-'):m}
+function fmtMat(m){const o=(m||'').toUpperCase().trim(),s=o.replace(/[\s-]/g,'');return /^[A-Z0-9]{6}$/.test(s)?s.match(/../g).join('-'):o}
 function fmtDur(min){if(min==null||isNaN(min))return '—';if(min>=1440){const th=Math.round(min/60);return `${Math.floor(th/24)} d ${th%24} h`}return `${Math.floor(min/60)}h${pad(Math.round(min%60))}`}
 
 /* ---------- Estado ---------- */
@@ -245,6 +251,19 @@ const kV=v=>(v.dataSaida||'')+(v.horaSaida||'');
 const kD=r=>(r.data||'')+(r.hora||'');
 const nomesCond=()=>[...new Set([...S.condutores.map(c=>c.nome),...S.viagens.map(v=>v.condutor)].filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b,'pt'));
 function anos(){const s=new Set([String(new Date().getFullYear())]);S.viagens.forEach(v=>v.dataSaida&&s.add(v.dataSaida.slice(0,4)));['abastecimentos','inspecoes','manutencoes'].forEach(t=>S[t].forEach(r=>r.data&&s.add(r.data.slice(0,4))));Object.keys(S.config.orcamento||{}).forEach(y=>s.add(y));return [...s].sort().reverse()}
+
+/* ---------- Seguros ---------- */
+const OBJ_SEG={viatura:'Viatura (carrinha)',atrelado:'Atrelado do barco'};
+function menosUmMes(d){const x=new Date(d+'T12:00:00');const dia=x.getDate();x.setDate(1);x.setMonth(x.getMonth()-1);
+ x.setDate(Math.min(dia,new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`}
+function maisUmDia(d,anos=0){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+1);x.setFullYear(x.getFullYear()+anos);return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`}
+function segAtual(obj){const l=S.seguros.filter(s=>s.objeto===obj).sort((a,b)=>(b.fim||'').localeCompare(a.fim||''));
+ const h=hoje();return l.find(s=>s.inicio<=h&&s.fim>=h)||l[0]||null}
+function estadoSeg(s){if(!s||!s.fim)return{c:'mut',t:'Sem seguro registado'};const h=hoje(),d=dias(h,s.fim);
+ if(d<0)return{c:'bad',t:`Expirado há ${-d} ${-d===1?'dia':'dias'}`,d};
+ if(s.inicio&&s.inicio>h)return{c:'mut',t:`Começa a ${fmtD(s.inicio)}`,d};
+ if(h>=menosUmMes(s.fim))return{c:'warn',t:`Termina daqui a ${d} ${d===1?'dia':'dias'}`,d};
+ return{c:'ok',t:'Em vigor',d}}
 
 /* ---------- Esquemas de registo ---------- */
 const SC={
@@ -306,7 +325,14 @@ const SC={
   {k:'data',l:'Data',t:'date',req:1},{k:'hora',l:'Hora',t:'time'},{k:'condutor',l:'Condutor',list:'dl-cond'},
   {k:'local',l:'Local',req:1,full:1},{k:'descricao',l:'Descrição do acidente',t:'textarea',rows:3,req:1,full:1},
   {k:'danos',l:'Danos',t:'textarea',full:1},{k:'entidades',l:'Entidades envolvidas',w:2},{k:'participacao',l:'Participação',t:'select',opts:['Não','Sim']}],
-  def:()=>({data:hoje(),participacao:'Não'})}
+  def:()=>({data:hoje(),participacao:'Não'})},
+ seguros:{nome:'seguro',campos:[
+  {k:'objeto',l:'Seguro de',t:'select',opts:Object.values(OBJ_SEG),req:1,w:2},{k:'matricula',l:'Matrícula',req:1},
+  {k:'apolice',l:'N.º da apólice',req:1},{k:'seguradora',l:'Seguradora',w:2},
+  {k:'inicio',l:'Início da validade',t:'date',req:1},{k:'fim',l:'Fim da validade',t:'date',req:1},{k:'premio',l:'Prémio (€)',t:'number',step:'0.01'},
+  {k:'obs',l:'Observações',t:'textarea',full:1}],
+  def:()=>({objeto:OBJ_SEG.viatura}),
+  validar(r){if(r.fim<r.inicio)return 'A data de fim tem de ser posterior à data de início.'}}
 };
 
 /* ---------- Formulário genérico ---------- */
@@ -323,6 +349,7 @@ function campoHTML(f,val){
 function abrirForm(tipo,id,preset={}){
  const sc=SC[tipo],ex=id?S[tipo].find(r=>r.id===id):null;
  const rec={...(ex?ex:(sc.def?sc.def():{})),...preset};
+ if(tipo==='seguros'&&OBJ_SEG[rec.objeto])rec.objeto=OBJ_SEG[rec.objeto];
  $('#dl-cond').innerHTML=nomesCond().map(n=>`<option value="${esc(n)}">`).join('');
  const frm=$('#frm');
  frm.innerHTML=`<header><h2>${ex?'Editar':'Registar'} ${sc.nome}</h2></header>
@@ -336,6 +363,7 @@ function abrirForm(tipo,id,preset={}){
   if(!frm.reportValidity())return;
   const r={...(ex||{}),id:ex?ex.id:uid()};
   sc.campos.forEach(f=>{if(f.t==='sec')return;const v=f.t==='sig'?frm.elements[f.k].value:frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
+  if(tipo==='seguros'){r.objeto=Object.keys(OBJ_SEG).find(k=>OBJ_SEG[k]===r.objeto)||'viatura';r.matricula=r.matricula.toUpperCase().replace(/\s+/g,'')}
   const err=sc.validar&&sc.validar(r);if(err){alert(err);return}
   const w=sc.aviso&&sc.aviso(r);if(w&&!confirm(w))return;
   guardar(tipo,r);sc.depois&&sc.depois(r);$('#dlg').close();render();toast('Registo guardado');
@@ -416,12 +444,17 @@ function alertas(){
  const y=h.slice(0,4),g=galp(y);
  if(g.prev&&g.rest<0)al.push({n:'bad',t:`Orçamento ${esc(c.pagamentoOrcamento)} de ${y} ultrapassado em ${eur(-g.rest)}.`});
  else if(g.prev&&g.pct>=.85)al.push({n:'warn',t:`Restam ${eur(g.rest)} do orçamento ${esc(c.pagamentoOrcamento)} de ${y}.`});
+ Object.keys(OBJ_SEG).forEach(o=>{const s=segAtual(o),e=estadoSeg(s),nm=o==='viatura'?'da viatura':'do atrelado do barco';
+  const bt=s?` <button class="btn sm" data-act="renovar-seg" data-id="${s.id}">Registar renovação</button>`:'';
+  if(e.c==='bad')al.push({n:'bad',t:`O seguro ${nm} (${esc(fmtMat(s.matricula))}, apólice ${esc(s.apolice)}) expirou a ${fmtD(s.fim)}.${bt}`});
+  else if(e.c==='warn')al.push({n:'warn',t:`O seguro ${nm} (${esc(fmtMat(s.matricula))}, apólice ${esc(s.apolice)}) termina a ${fmtD(s.fim)} — daqui a ${e.d} ${e.d===1?'dia':'dias'}.${bt}`});
+  else if(!s)al.push({n:'info',t:`Ainda não há seguro registado ${nm}. <button class="btn sm" data-act="tab" data-tab="seguros">Abrir Seguros</button>`})});
  if(ab&&dias(ab.dataSaida,h)>=1)al.push({n:'info',t:`A saída de ${fmtD(ab.dataSaida)} ainda não tem entrada registada.`});
  return al;
 }
 
 /* ---------- Vistas ---------- */
-const TABS=[['inicio','Início'],['diario','Diário'],['abastecimentos','Abastecimentos'],['inspecoes','Inspeções'],['manutencao','Manutenção'],['acidentes','Acidentes'],['condutores','Condutores'],['resumo','Resumo anual'],['definicoes','Definições']];
+const TABS=[['inicio','Início'],['diario','Diário'],['abastecimentos','Abastecimentos'],['inspecoes','Inspeções'],['manutencao','Manutenção'],['acidentes','Acidentes'],['seguros','Seguros'],['condutores','Condutores'],['resumo','Resumo anual'],['definicoes','Definições']];
 let tab=location.hash.slice(1)||'inicio';if(!TABS.some(t=>t[0]===tab))tab='inicio';
 const F={ano:String(new Date().getFullYear()),mes:'',condutor:'',categoria:'',q:''};
 let subMan='manutencoes',anoRes=String(new Date().getFullYear());
@@ -518,6 +551,24 @@ V.manutencao=()=>{
  <div class="seg" role="group">${segs.map(s=>`<button data-act="sub" data-sub="${s[0]}" aria-pressed="${subMan===s[0]}">${s[1]}</button>`).join('')}</div>${body}`;
 };
 
+V.seguros=()=>{
+ const cart=o=>{const s=segAtual(o),e=estadoSeg(s);
+  return `<div class="card segc"><div class="segh"><h3>${OBJ_SEG[o]}</h3><span class="b ${e.c}">${e.t}</span></div>
+  ${s?`<dl><div><dt>Matrícula</dt><dd><b class="mat">${esc(fmtMat(s.matricula))}</b></dd></div><div><dt>Apólice</dt><dd>${esc(s.apolice)}</dd></div>
+   ${s.seguradora?`<div><dt>Seguradora</dt><dd>${esc(s.seguradora)}</dd></div>`:''}
+   <div><dt>Validade</dt><dd>${fmtD(s.inicio)} a <b>${fmtD(s.fim)}</b></dd></div>
+   <div><dt>Alerta a partir de</dt><dd>${fmtD(menosUmMes(s.fim))}</dd></div></dl>
+   <div class="row"><button class="btn primary" data-act="renovar-seg" data-id="${s.id}">Registar renovação</button><button class="btn" data-act="edit" data-tipo="seguros" data-id="${s.id}">Editar</button></div>`
+  :`<p class="muted">Registe a matrícula, o número da apólice e a validade.</p><button class="btn primary" data-act="novo-seg" data-obj="${o}">Adicionar seguro</button>`}</div>`};
+ const l=[...S.seguros].sort((a,b)=>(b.fim||'').localeCompare(a.fim||''));
+ return `<div class="head"><h2>Seguros</h2><button class="btn" data-act="novo" data-tipo="seguros">Adicionar apólice</button></div>
+ <div class="segs">${cart('viatura')}${cart('atrelado')}</div>
+ <p class="muted" style="font-size:.88rem">O alerta aparece na página inicial um mês antes da data de fim de cada apólice.</p>
+ <h3 style="margin:18px 0 8px">Histórico de apólices</h3>
+ ${tabela('seguros',l,[{l:'Seguro de',v:r=>esc(OBJ_SEG[r.objeto]||r.objeto)},{l:'Matrícula',c:'nw',v:r=>esc(fmtMat(r.matricula))},{l:'Apólice',c:'nw',v:r=>esc(r.apolice)},
+  {l:'Seguradora',v:r=>esc(r.seguradora)},{l:'Início',c:'nw',v:r=>fmtD(r.inicio)},{l:'Fim',c:'nw',v:r=>fmtD(r.fim)},{l:'Prémio',c:'num',v:r=>r.premio!=null?eur(r.premio):'—'},
+  {l:'Estado',c:'nw',v:r=>{const e=estadoSeg(r);return `<span class="b ${e.c}">${r.fim<hoje()?'Expirado':e.t}</span>`}}])}`;
+};
 V.acidentes=()=>{const l=[...S.acidentes].sort((a,b)=>kD(b).localeCompare(kD(a)));
  return `<div class="head"><h2>Registo de acidentes</h2><button class="btn primary" data-act="novo" data-tipo="acidentes">Registar acidente</button></div>
  ${tabela('acidentes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)+(r.hora?`<span class="sub">${r.hora}</span>`:'')},{l:'Local',v:r=>esc(r.local)},{l:'Condutor',v:r=>esc(r.condutor)},
@@ -598,6 +649,7 @@ function exportXlsx(){
  add('Manutenção e Reparações',asc('manutencoes',kD).map(r=>({'Data':fmtD(r.data),'Tipo de Operação':r.tipo,'Descrição':r.descricao,'Fornecedor':r.fornecedor,'Custo':r.custo,'Km':r.km,'Observações':r.obs})));
  add('Regenerações',asc('regeneracoes',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Tipo de Regeneração':r.tipo,'Duração (min)':r.duracao,'Resultado':r.resultado,'Observações':r.obs})));
  add('Lista Condutores',S.condutores.map(r=>({'Nome':r.nome,'Carta Condução':r.carta,'Validade':fmtD(r.validade),'Despacho':r.despacho,'Reboque':r.reboque})));
+ add('Seguros',[...S.seguros].sort((a,b)=>(a.inicio||'').localeCompare(b.inicio||'')).map(r=>({'Seguro de':OBJ_SEG[r.objeto]||r.objeto,'Matrícula':fmtMat(r.matricula),'N.º Apólice':r.apolice,'Seguradora':r.seguradora,'Início':fmtD(r.inicio),'Fim':fmtD(r.fim),'Prémio':r.premio,'Observações':r.obs})));
  add('Registo Acidentes',asc('acidentes',kD).map(r=>({'Data':fmtD(r.data),'Hora':r.hora,'Local':r.local,'Condutor':r.condutor,'Descrição do Acidente':r.descricao,'Danos':r.danos,'Entidades Envolvidas':r.entidades,'Participação':r.participacao})));
  XLSX.writeFile(wb,nomeBase()+'.xlsx');
 }
@@ -677,6 +729,11 @@ document.addEventListener('click',e=>{
  const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;const a=b.dataset.act;
  if(a==='tab'){tab=b.dataset.tab;history.replaceState(null,'','#'+tab);render();window.scrollTo(0,0);b.scrollIntoView?.({inline:'nearest',block:'nearest'})}
  else if(a==='novo')abrirForm(b.dataset.tipo);
+ else if(a==='edit')abrirForm(b.dataset.tipo,b.dataset.id);
+ else if(a==='novo-seg'){const o=b.dataset.obj;const ult=S.seguros.filter(s=>s.objeto===o).slice(-1)[0];
+  abrirForm('seguros',null,{objeto:o,matricula:ult?ult.matricula:(o==='viatura'?S.config.viatura.matricula:''),inicio:hoje()})}
+ else if(a==='renovar-seg'){const s=S.seguros.find(x=>x.id===b.dataset.id);if(!s)return;
+  abrirForm('seguros',null,{objeto:s.objeto,matricula:s.matricula,apolice:s.apolice,seguradora:s.seguradora||'',premio:s.premio??null,inicio:maisUmDia(s.fim),fim:maisUmDia(s.fim,1).replace(/(\d{4}-\d{2}-\d{2})/,d=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()-1);return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`})})}
  else if(a==='rubricar')abrirRubrica(b.dataset.tipo,b.dataset.id);
  else if(a==='entrada')abrirForm('viagens',b.dataset.id,{dataEntrada:hoje(),horaEntrada:agora()});
  else if(a==='sub'){subMan=b.dataset.sub;render()}
