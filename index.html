@@ -146,6 +146,33 @@ dialog footer .sp{flex:1}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:99;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%)}
 #print{display:none}
+.charts{align-items:start;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px}
+.chart{padding:16px 18px 14px}
+.chart h3{font-size:1.1rem}.chart>p{margin:2px 0 14px;font-size:.88rem}
+.ch-empty{padding:30px 0;text-align:center;color:var(--muted)}
+.ch-cols{display:grid;grid-template-columns:auto 1fr;gap:8px;height:190px}
+.ch-axis{display:flex;flex-direction:column;justify-content:space-between;font-size:.75rem;color:var(--muted);text-align:right;padding-bottom:22px;margin-top:-.5em;font-variant-numeric:tabular-nums}
+.ch-plot{position:relative;display:flex;align-items:stretch;padding-bottom:22px}
+.ch-gl{position:absolute;left:0;right:0;top:0;bottom:22px;pointer-events:none}
+.ch-grid{position:absolute;left:0;right:0;height:1px;background:var(--line);transform:translateY(.5px)}
+.ch-grid.base{background:var(--muted);opacity:.55}
+.ch-col{position:relative;z-index:1;flex:1;display:flex;justify-content:center;align-items:flex-end;cursor:default;outline-offset:-2px}
+.ch-bar{position:relative;width:min(24px,62%);background:var(--hydra);border-radius:4px 4px 0 0;min-height:0}
+.ch-bar.zero{height:0!important}
+.ch-col:hover .ch-bar,.ch-col:focus .ch-bar{filter:brightness(1.15)}
+.ch-col:hover,.ch-col:focus{background:var(--hydra-soft)}
+.ch-cap{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-3px);font-size:.75rem;font-weight:600;white-space:nowrap;color:var(--ink)}
+.ch-x{position:absolute;bottom:-22px;left:0;right:0;text-align:center;font-size:.75rem;color:var(--muted)}
+.ch-rows{display:grid;gap:4px}
+.ch-row{display:grid;grid-template-columns:minmax(90px,44%) 1fr;gap:10px;align-items:center;padding:3px 4px;border-radius:6px;cursor:default}
+.ch-row:hover,.ch-row:focus{background:var(--hydra-soft)}
+.ch-lbl{font-size:.88rem;line-height:1.25}
+.ch-track{display:flex;align-items:center;gap:8px}
+.ch-track i{display:block;height:16px;background:var(--hydra);border-radius:0 4px 4px 0}
+.ch-track b{font-size:.85rem;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+#tip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:var(--paper);font-size:.85rem;padding:6px 10px;border-radius:7px;opacity:0;transition:opacity .12s;max-width:260px}
+#tip.on{opacity:1}
+@media (max-width:460px){.ch-x{font-size:.62rem}.ch-cap{font-size:.68rem}}
 .fld[hidden]{display:none}
 output.calc{display:flex;align-items:center;min-height:42px;padding:9px 10px;border-radius:8px;background:var(--hydra-soft);font-variant-numeric:tabular-nums;font-weight:500}
 output.calc.big{font:600 1.5rem var(--fc);justify-content:space-between}
@@ -206,6 +233,7 @@ td.svc{min-width:240px}
 <datalist id="dl-tipoman"><option>Revisão</option><option>Mudança de óleo</option><option>Reparação</option><option>Garantia</option><option>Lavagem</option><option>Outro</option></datalist>
 <input type="file" id="fileIn" accept=".json,application/json" hidden>
 <div class="toast" id="toast" role="status"></div>
+<div id="tip" role="tooltip"></div>
 <div id="print"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
@@ -631,6 +659,26 @@ V.condutores=()=>{const h=hoje(),a=S.config.cartaAvisoDias,l=[...S.condutores].s
   {l:'Despacho',v:r=>esc(r.despacho)||'—'},{l:'Reboque',v:r=>esc(r.reboque)||'—'},
   {l:'Saídas',c:'num',v:r=>S.viagens.filter(v=>v.condutor===r.nome).length},{l:'Km conduzidos',c:'num',v:r=>fmtN(sum(S.viagens.filter(v=>v.condutor===r.nome),kmFeitos))}])}`};
 
+/* ---------- Gráficos ---------- */
+function niceMax(v){if(v<=0)return 1;const e=Math.pow(10,Math.floor(Math.log10(v))),f=v/e;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*e}
+function colunas(dados,fmt,fmtEixo){
+ const mx=Math.max(...dados.map(d=>d.v)),top=niceMax(mx),ticks=[0,top/2,top];
+ if(!mx)return '<div class="ch-empty">Sem dados neste ano.</div>';
+ const iMax=dados.findIndex(d=>d.v===mx);
+ return `<div class="ch-cols" role="img" aria-label="${esc(dados.map(d=>d.l+': '+fmt(d.v)).join('; '))}">
+  <div class="ch-axis">${ticks.slice().reverse().map(v=>`<span>${fmtEixo(v)}</span>`).join('')}</div>
+  <div class="ch-plot"><div class="ch-gl">${ticks.map((v,i)=>`<i class="ch-grid${i?'':' base'}" style="bottom:${v/top*100}%"></i>`).join('')}</div>
+   ${dados.map((d,i)=>`<div class="ch-col" data-tip="${esc(d.tip||d.l)}: ${esc(fmt(d.v))}" tabindex="0">
+    <div class="ch-bar${d.v?'':' zero'}" style="height:${d.v/top*100}%">${i===iMax?`<b class="ch-cap">${esc(fmt(d.v))}</b>`:''}</div>
+    <span class="ch-x">${esc(d.l)}</span></div>`).join('')}</div></div>`;
+}
+function barras(dados,fmt){
+ const mx=Math.max(0,...dados.map(d=>d.v));if(!mx)return '<div class="ch-empty">Sem dados neste ano.</div>';
+ return `<div class="ch-rows">${dados.map(d=>`<div class="ch-row" data-tip="${esc(d.l)}: ${esc(fmt(d.v))}${d.extra?' — '+esc(d.extra):''}" tabindex="0">
+  <span class="ch-lbl">${esc(d.l)}</span><span class="ch-track"><i style="width:${Math.max(1.5,d.v/mx*100)}%"></i><b>${esc(fmt(d.v))}</b></span></div>`).join('')}</div>`;
+}
+const eixoNum=v=>v>=1000?fmtN(v/1000,v%1000?1:0)+' mil':fmtN(v,v%1?1:0);
+
 V.resumo=()=>{
  const y=anoRes,vs=S.viagens.filter(v=>(v.dataSaida||'').startsWith(y)),as=S.abastecimentos.filter(a=>(a.data||'').startsWith(y));
  const m=MESES.map((n,i)=>{const mm=`${y}-${pad(i+1)}`,v=vs.filter(x=>x.dataSaida.startsWith(mm)),a=as.filter(x=>x.data.startsWith(mm));
@@ -640,6 +688,13 @@ V.resumo=()=>{
  const cm=cats.map(c=>({c,m:MESES.map((_,i)=>vs.filter(v=>v.categoria===c&&v.dataSaida.slice(5,7)===pad(i+1)).length)})).filter(r=>r.m.some(Boolean));
  const cond=nomesCond().map(n=>({n,s:vs.filter(v=>v.condutor===n).length,km:sum(vs.filter(v=>v.condutor===n),kmFeitos)})).filter(x=>x.s);
  return `<div class="head"><h2>Resumo anual</h2><select class="btn" data-act="ano-res" aria-label="Ano">${anos().map(a=>`<option${a===y?' selected':''}>${a}</option>`).join('')}</select></div>
+ <section class="charts">
+  <div class="card chart"><h3>Km percorridos por mês</h3><p class="muted">Total: ${fmtN(sum(m,x=>x.km))} km</p>${colunas(m.map((x,i)=>({l:MES3[i],tip:x.n,v:x.km})),v=>fmtN(v)+' km',eixoNum)}</div>
+  <div class="card chart"><h3>Saídas por mês</h3><p class="muted">Total: ${sum(m,x=>x.s)} saídas</p>${colunas(m.map((x,i)=>({l:MES3[i],tip:x.n,v:x.s})),v=>v+(v===1?' saída':' saídas'),eixoNum)}</div>
+  <div class="card chart"><h3>Combustível por mês</h3><p class="muted">Total pago: ${eur(sum(m,x=>x.e))} — ${fmtN(sum(m,x=>x.l),1)} L</p>${colunas(m.map((x,i)=>({l:MES3[i],tip:x.n,v:r2(x.e)})),v=>eur(v),v=>fmtN(v,0)+' €')}</div>
+  <div class="card chart"><h3>Saídas por categoria</h3><p class="muted">${vs.length} saídas em ${y}</p>${barras(cm.map(r=>({l:r.c,v:r.m.reduce((a,b)=>a+b,0),extra:fmtN(sum(vs.filter(v=>v.categoria===r.c),kmFeitos))+' km'})).sort((a,b)=>b.v-a.v),v=>String(v))}</div>
+  <div class="card chart"><h3>Km por condutor</h3><p class="muted">${cond.length} ${cond.length===1?'condutor':'condutores'}</p>${barras(cond.map(c=>({l:c.n,v:c.km,extra:c.s+(c.s===1?' saída':' saídas')})).sort((a,b)=>b.v-a.v),v=>fmtN(v)+' km')}</div>
+ </section>
  <section><h3 style="margin-bottom:8px">Por mês</h3><div class="card scroll"><table><thead><tr><th>Mês</th><th class="num">Saídas</th><th class="num">Km efetuados</th><th class="num">Tempo em serviço</th><th class="num">Litros</th><th class="num">Combustível</th></tr></thead><tbody>
  ${m.map(x=>`<tr><td>${x.n}</td><td class="num">${z(x.s)}</td><td class="num"><div class="bar-cell"><i style="width:${x.km/mx*90}px"></i>${x.km?fmtN(x.km):z(0)}</div></td><td class="num">${x.min?fmtDur(x.min):z(0)}</td><td class="num">${x.l?fmtN(x.l,2):z(0)}</td><td class="num">${x.e?eur(x.e):z(0)}</td></tr>`).join('')}
  </tbody><tfoot><tr><td>Total</td><td class="num">${sum(m,x=>x.s)}</td><td class="num">${fmtN(sum(m,x=>x.km))}</td><td class="num">${fmtDur(sum(m,x=>x.min))}</td><td class="num">${fmtN(sum(m,x=>x.l),2)}</td><td class="num">${eur(sum(m,x=>x.e))}</td></tr></tfoot></table></div></section>
@@ -814,6 +869,14 @@ function guardarCfg(){
  c.orcamento=orc;c.inspecaoDias=Number(g('inspecaoDias'))||30;c.cartaAvisoDias=Number(g('cartaAvisoDias'))||60;
  saveLocal();fbCfg();render();toast('Definições guardadas');
 }
+(()=>{const tip=$('#tip');
+ const show=el=>{tip.textContent=el.dataset.tip;tip.classList.add('on');const r=el.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+  let x=r.left+r.width/2-w/2;x=Math.max(8,Math.min(innerWidth-w-8,x));let y=r.top-h-8;if(y<8)y=r.bottom+8;tip.style.left=x+'px';tip.style.top=y+'px'};
+ const hide=()=>tip.classList.remove('on');
+ document.addEventListener('pointerover',e=>{const el=e.target.closest('[data-tip]');el?show(el):hide()});
+ document.addEventListener('focusin',e=>{const el=e.target.closest('[data-tip]');el?show(el):hide()});
+ document.addEventListener('scroll',hide,true);
+})();
 render();setSync('local');fbIniciar();
 </script>
 </body>
