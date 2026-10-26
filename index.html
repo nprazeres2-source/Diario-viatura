@@ -146,6 +146,9 @@ dialog footer .sp{flex:1}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:99;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%)}
 #print{display:none}
+.fld[hidden]{display:none}
+output.calc{display:flex;align-items:center;min-height:42px;padding:9px 10px;border-radius:8px;background:var(--hydra-soft);font-variant-numeric:tabular-nums;font-weight:500}
+output.calc.big{font:600 1.5rem var(--fc);justify-content:space-between}
 .segs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:10px}
 .segc{padding:18px}
 .segh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
@@ -252,6 +255,17 @@ const kD=r=>(r.data||'')+(r.hora||'');
 const nomesCond=()=>[...new Set([...S.condutores.map(c=>c.nome),...S.viagens.map(v=>v.condutor)].filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b,'pt'));
 function anos(){const s=new Set([String(new Date().getFullYear())]);S.viagens.forEach(v=>v.dataSaida&&s.add(v.dataSaida.slice(0,4)));['abastecimentos','inspecoes','manutencoes'].forEach(t=>S[t].forEach(r=>r.data&&s.add(r.data.slice(0,4))));Object.keys(S.config.orcamento||{}).forEach(y=>s.add(y));return [...s].sort().reverse()}
 
+/* ---------- Abastecimentos: IVA ---------- */
+const r2=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+const r4=v=>Math.round((Number(v)+Number.EPSILON)*10000)/10000;
+function calcIVA(a){
+ if(a.precoSemIva==null||a.precoSemIva===''||!a.litros)return a.valor!=null?{legado:true,total:Number(a.valor)}:null;
+ const pcd=r4(r4(a.precoSemIva)-r4(Number(a.descUnit)||0)),base=r2(Number(a.litros)*pcd),taxa=Number(a.taxaIva)||0,iva=r2(base*taxa/100);
+ return{pcd,base,taxa,iva,total:r2(base+iva)};
+}
+const ehGalp=p=>/galp\s*frota/i.test(p||'');
+function ultimaTaxa(){const l=S.abastecimentos.filter(a=>a.taxaIva!=null).sort((a,b)=>kD(b).localeCompare(kD(a)));return l.length?l[0].taxaIva:16}
+
 /* ---------- Seguros ---------- */
 const OBJ_SEG={viatura:'Viatura (carrinha)',atrelado:'Atrelado do barco'};
 function menosUmMes(d){const x=new Date(d+'T12:00:00');const dia=x.getDate();x.setDate(1);x.setMonth(x.getMonth()-1);
@@ -290,9 +304,23 @@ const SC={
   depois(r){pref.condutor=r.condutor;savePref()}},
  abastecimentos:{nome:'abastecimento',campos:[
   {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km no abastecimento',t:'number',step:1,req:1},{k:'litros',l:'Litros',t:'number',step:'0.01',req:1},
-  {k:'valor',l:'Valor (€)',t:'number',step:'0.01',req:1},{k:'fatura',l:'N.º da fatura'},{k:'pagamento',l:'Pagamento',t:'select',opts:()=>S.config.pagamentos},
+  {t:'sec',l:'Pagamento e valor'},
+  {k:'pagamento',l:'Pagamento',t:'select',opts:()=>S.config.pagamentos,req:1,w:2},{k:'fatura',l:'N.º da fatura'},
+  {k:'precoSemIva',l:'Preço L s/IVA (€) *',t:'number',step:'0.0001',dec:4,grp:'galp'},{k:'descUnit',l:'Desc. unitário s/IVA (€/L)',t:'number',step:'0.0001',dec:4,grp:'galp'},{k:'precoComDesc',l:'Preço c/desc. s/IVA (€/L)',t:'out',grp:'galp'},
+  {k:'taxaIva',l:'Taxa IVA (%) *',t:'number',step:'any',grp:'galp'},{k:'baseSemIva',l:'Total s/IVA',t:'out',grp:'galp'},{k:'iva',l:'Total IVA',t:'out',grp:'galp'},
+  {k:'valor',l:'Total com IVA',t:'out',big:1,full:1,grp:'galp'},
+  {k:'valorPago',l:'Valor pago (€) *',t:'number',step:'0.01',grp:'manual'},
+  {t:'sec',l:'Condutor'},
   {k:'condutor',l:'Condutor',list:'dl-cond'},{k:'obs',l:'Observações',w:2},{k:'rubrica',l:'Rubrica',t:'sig'}],
-  def:()=>({data:hoje(),km:kmAtual()||null,condutor:pref.condutor||'',pagamento:S.config.pagamentoOrcamento||''})},
+  def:()=>({data:hoje(),km:kmAtual()||null,condutor:pref.condutor||'',pagamento:S.config.pagamentoOrcamento||'',descUnit:0,taxaIva:ultimaTaxa()}),
+  validar(r,ex){
+   const legado=ex&&ehGalp(ex.pagamento)&&ex.precoSemIva==null&&ex.valor!=null;
+   if(!ehGalp(r.pagamento)){if(!(r.valorPago>0))return 'Indique o valor pago.';return}
+   if(r.precoSemIva==null&&!legado)return 'Indique o preço por litro sem IVA.';
+   if(r.precoSemIva!=null&&r.taxaIva==null)return 'Indique a taxa de IVA.';
+   if(r.precoSemIva!=null&&(r.descUnit||0)>r.precoSemIva)return 'O desconto unitário não pode ser superior ao preço por litro.'},
+  antes(r){if(!ehGalp(r.pagamento)){r.valor=r2(r.valorPago);['precoSemIva','descUnit','precoComDesc','taxaIva','baseSemIva','iva'].forEach(k=>r[k]=null);delete r.valorPago;return}
+   delete r.valorPago;if(r.precoSemIva!=null)r.precoSemIva=r4(r.precoSemIva);if(r.descUnit!=null)r.descUnit=r4(r.descUnit);const c=calcIVA(r);if(c&&!c.legado){r.descUnit=r.descUnit??0;r.precoComDesc=c.pcd;r.baseSemIva=c.base;r.iva=c.iva;r.valor=c.total}}},
  pneus:{nome:'substituição de pneus',campos:[
   {k:'data',l:'Data',t:'date',req:1},{k:'km',l:'Km',t:'number',step:1,req:1},{k:'oficina',l:'Oficina'},
   {k:'observacoes',l:'Observações',t:'textarea',full:1},{k:'condutor',l:'Nome',list:'dl-cond'},{k:'rubrica',l:'Rubrica',t:'sig'}],
@@ -338,17 +366,19 @@ const SC={
 /* ---------- Formulário genérico ---------- */
 function campoHTML(f,val){
  if(f.t==='sec')return `<h3 class="sec full">${f.l}${f.hint?` <small class="muted" style="font:400 .85rem var(--f)">— ${f.hint}</small>`:''}</h3>`;
+ if(f.t==='out')return `<div class="fld${f.full?' full':''}"${f.grp?` data-grp="${f.grp}"`:''}><span>${f.l}</span><output class="calc${f.big?' big':''}" data-out="${f.k}">—</output></div>`;
  if(f.t==='sig')return `<div class="fld full"><span>${f.l}</span><div class="sigbox"><canvas data-sig="${f.k}" aria-label="Área para assinar com o dedo ou caneta"></canvas><i class="sigl"></i><span class="sigx">Assine aqui</span><button type="button" class="btn sm" data-sigclear="${f.k}">Limpar</button></div><input type="hidden" name="${f.k}" value="${esc(val||'')}"></div>`;
  const id='f_'+f.k,req=f.req?' required':'',v=val??'';let inp;
  if(f.t==='select'){const opts=typeof f.opts==='function'?f.opts():f.opts;const list=[...opts];if(v!==''&&!list.includes(v))list.unshift(v);
   inp=`<select id="${id}" name="${f.k}"${req}><option value=""${v===''?' selected':''}>—</option>${list.map(o=>`<option${o===v?' selected':''}>${esc(o)}</option>`).join('')}</select>`}
  else if(f.t==='textarea')inp=`<textarea id="${id}" name="${f.k}" rows="${f.rows||2}"${req}>${esc(v)}</textarea>`;
  else inp=`<input id="${id}" name="${f.k}" type="${f.t||'text'}" value="${esc(v)}"${req}${f.t==='number'?` step="${f.step||'any'}" min="0" inputmode="${f.step===1?'numeric':'decimal'}"`:''}${f.list?` list="${f.list}"`:''} autocomplete="off">`;
- return `<label class="fld${f.full?' full':f.w===2?' w2':''}" for="${id}"><span>${f.l}${f.req?' *':''}</span>${inp}${f.hint?`<small>${f.hint}</small>`:''}</label>`;
+ return `<label class="fld${f.full?' full':f.w===2?' w2':''}" for="${id}"${f.grp?` data-grp="${f.grp}"`:''}><span>${f.l}${f.req?' *':''}</span>${inp}${f.hint?`<small>${f.hint}</small>`:''}</label>`;
 }
 function abrirForm(tipo,id,preset={}){
  const sc=SC[tipo],ex=id?S[tipo].find(r=>r.id===id):null;
  const rec={...(ex?ex:(sc.def?sc.def():{})),...preset};
+ if(tipo==='abastecimentos'&&rec.valorPago==null&&!ehGalp(rec.pagamento))rec.valorPago=rec.valor??null;
  if(tipo==='seguros'&&OBJ_SEG[rec.objeto])rec.objeto=OBJ_SEG[rec.objeto];
  $('#dl-cond').innerHTML=nomesCond().map(n=>`<option value="${esc(n)}">`).join('');
  const frm=$('#frm');
@@ -362,14 +392,31 @@ function abrirForm(tipo,id,preset={}){
   e.preventDefault();
   if(!frm.reportValidity())return;
   const r={...(ex||{}),id:ex?ex.id:uid()};
-  sc.campos.forEach(f=>{if(f.t==='sec')return;const v=f.t==='sig'?frm.elements[f.k].value:frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
+  sc.campos.forEach(f=>{if(f.t==='sec'||f.t==='out')return;const v=f.t==='sig'?frm.elements[f.k].value:frm.elements[f.k].value.trim();r[f.k]=f.t==='number'?(v===''?null:Number(v)):v});
   if(tipo==='seguros'){r.objeto=Object.keys(OBJ_SEG).find(k=>OBJ_SEG[k]===r.objeto)||'viatura';r.matricula=r.matricula.toUpperCase().replace(/\s+/g,'')}
-  const err=sc.validar&&sc.validar(r);if(err){alert(err);return}
+  const err=sc.validar&&sc.validar(r,ex);if(err){alert(err);return}
+  sc.antes&&sc.antes(r);
   const w=sc.aviso&&sc.aviso(r);if(w&&!confirm(w))return;
   guardar(tipo,r);sc.depois&&sc.depois(r);$('#dlg').close();render();toast('Registo guardado');
  };
  $('#dlg').showModal();
  iniciarPads(frm);
+ if(tipo==='abastecimentos'){
+  const num=k=>{const v=frm.elements[k].value.trim();return v===''?null:Number(v)};
+  const upd=()=>{const a={litros:num('litros'),precoSemIva:num('precoSemIva'),descUnit:num('descUnit'),taxaIva:num('taxaIva'),valor:ex&&ehGalp(ex.pagamento)&&ex.precoSemIva==null?ex.valor:null};
+   const c=calcIVA(a),o=k=>frm.querySelector(`[data-out=${k}]`);
+   if(c&&c.legado){['precoComDesc','baseSemIva','iva'].forEach(k=>o(k).textContent='—');o('valor').innerHTML=`${eur(c.total)} <small class="muted">registo antigo, sem detalhe do IVA</small>`;return}
+   o('precoComDesc').textContent=c?fmtN(c.pcd,4)+' €':'—';o('baseSemIva').textContent=c?eur(c.base):'—';
+   o('iva').textContent=c?`${eur(c.iva)} (${fmtN(c.taxa,c.taxa%1?1:0)}%)`:'—';o('valor').textContent=c?eur(c.total):'—'};
+  ['precoSemIva','descUnit'].forEach(k=>{const el=frm.elements[k];
+   el.addEventListener('input',()=>{const m=el.value.match(/^(\d*[.,]\d{4})\d+$/);if(m){el.value=m[1].replace(',','.');}});
+   el.addEventListener('blur',()=>{if(el.value!=='')el.value=r4(el.value).toFixed(4)})});
+  const modo=()=>{const g=ehGalp(frm.elements.pagamento.value);
+   frm.querySelectorAll('[data-grp]').forEach(el=>el.hidden=(el.dataset.grp==='galp')!==g);
+   if(g&&frm.elements.taxaIva.value==='')frm.elements.taxaIva.value=ultimaTaxa()};
+  frm.elements.pagamento.addEventListener('change',modo);modo();
+  frm.addEventListener('input',upd);upd();
+ }
  const foco=preset.dataEntrada?frm.elements.kmEntrada:frm.querySelector('input,select,textarea');
  if(foco&&!matchMedia('(pointer:coarse)').matches)foco.focus();
 }
@@ -515,12 +562,15 @@ V.abastecimentos=()=>{
   <b>${eur(g.rest)}</b> <span class="muted">restantes de ${eur(g.prev)}</span>
   <div class="meter"><i class="${g.pct>=1?'bad':g.pct>=.85?'warn':''}" style="width:${Math.min(100,g.pct*100)}%"></i></div></div>`}).join('')}</div>`:''}
  ${tabela('abastecimentos',l,[
-  {l:'Data',c:'nw',v:a=>fmtD(a.data)},{l:'Km',c:'num',v:a=>fmtN(a.km)},{l:'Litros',c:'num',v:a=>fmtN(a.litros,2)},{l:'Valor',c:'num',v:a=>eur(a.valor)},
-  {l:'Preço/L',c:'num',v:a=>a.litros?fmtN(a.valor/a.litros,3)+' €':'—'},
+  {l:'Data',c:'nw',v:a=>fmtD(a.data)},{l:'Km',c:'num',v:a=>fmtN(a.km)},{l:'Litros',c:'num',v:a=>fmtN(a.litros,2)},
+  {l:'Preço c/desc. s/IVA',c:'num',v:a=>{const c=calcIVA(a);return c&&!c.legado?`${fmtN(c.pcd,4)} €<span class="sub">${fmtN(a.precoSemIva,4)} − ${fmtN(a.descUnit||0,4)} desc.</span>`:'—'}},
+  {l:'Total s/IVA',c:'num',v:a=>{const c=calcIVA(a);return c&&!c.legado?eur(c.base):'—'}},
+  {l:'Total IVA',c:'num',v:a=>{const c=calcIVA(a);return c&&!c.legado?`${eur(c.iva)}<span class="sub">${fmtN(c.taxa,c.taxa%1?1:0)}%</span>`:'—'}},
+  {l:'Total pago (c/IVA)',c:'num',v:a=>`<b>${eur(a.valor)}</b>`},
   {l:'Desde o anterior',c:'num',v:a=>a.kmDesde!=null?`${fmtN(a.kmDesde)} km<span class="sub">${a.difDias} dias</span>`:'—'},
   {l:'Consumo estimado',c:'num',v:a=>a.consumo?fmtN(a.consumo,1)+' L/100':'—'},
   {l:'Fatura',c:'nw',v:a=>esc(a.fatura)},{l:'Pagamento',c:'nw',v:a=>esc(a.pagamento)},{l:'Condutor',c:'nw',v:a=>esc(a.condutor)},{l:'Rubrica',c:'sigc',v:a=>sigCel('abastecimentos',a)}],
-  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:7}])}
+  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:''},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.base:0})),c:'num'},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.iva:0})),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:7}])}
  <p class="muted" style="font-size:.88rem">O consumo estimado divide os litros de cada abastecimento pelos km feitos desde o anterior — é fiável quando se atesta sempre o depósito.</p>`;
 };
 
@@ -643,7 +693,7 @@ function exportXlsx(){
  const wb=XLSX.utils.book_new(),add=(n,r)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[{'Sem registos':''}]),n);
  const asc=(t,k)=>[...S[t]].sort((a,b)=>k(a).localeCompare(k(b)));
  add('Reg. Diário',asc('viagens',kV).map(v=>({'Data saída':fmtD(v.dataSaida),'Hora saída':v.horaSaida,'Km saída':v.kmSaida,'Data entrada':fmtD(v.dataEntrada),'Hora entrada':v.horaEntrada,'Km entrada':v.kmEntrada,'Km feitos':kmFeitos(v),'Tempo':fmtDur(minutos(v)),'Categoria':v.categoria,'Serviço efetuado':v.servico,'Condutor':v.condutor,'Rubricado':v.rubrica?'Sim':'Não','Observações':v.obs})));
- add('Abastecimentos',abastCalc().map(a=>({'Data':fmtD(a.data),'Km':a.km,'Litros':a.litros,'Valor':a.valor,'N.º Fatura':a.fatura,'Condutor':a.condutor,'Rubricado':a.rubrica?'Sim':'Não','Pagamento':a.pagamento,'Dif. tempo (dias)':a.difDias,'Km feitos':a.kmDesde,'Consumo L/100':a.consumo?+a.consumo.toFixed(1):null,'Observações':a.obs})));
+ add('Abastecimentos',abastCalc().map(a=>({'Data':fmtD(a.data),'Km':a.km,'Litros':a.litros,'Preço L s/IVA':a.precoSemIva,'Desc. unitário s/IVA':a.descUnit,'Preço c/desc. s/IVA':a.precoComDesc,'Taxa IVA (%)':a.taxaIva,'Total s/IVA':a.baseSemIva,'Total IVA':a.iva,'Total com IVA':a.valor,'N.º Fatura':a.fatura,'Condutor':a.condutor,'Rubricado':a.rubrica?'Sim':'Não','Pagamento':a.pagamento,'Dif. tempo (dias)':a.difDias,'Km feitos':a.kmDesde,'Consumo L/100':a.consumo?+a.consumo.toFixed(1):null,'Observações':a.obs})));
  add('Pneus',asc('pneus',kD).map(r=>({'Data':fmtD(r.data),'Km':r.km,'Oficina':r.oficina,'Observações':r.observacoes,'Nome':r.condutor,'Rubricado':r.rubrica?'Sim':'Não'})));
  add('Inspeções Mensais',asc('inspecoes',kD).map(r=>({'Data':fmtD(r.data),'Pneus':r.pneus,'Luzes':r.luzes,'Travões':r.travoes,'Óleo':r.oleo,'Líquidos':r.liquidos,'Extintor':r.extintor,'Diversos':r.diversos,'Observações':r.observacoes,'Verificado por':r.assinatura,'Assinado':r.rubrica?'Sim':'Não','Seguimento':r.seguimento})));
  add('Manutenção e Reparações',asc('manutencoes',kD).map(r=>({'Data':fmtD(r.data),'Tipo de Operação':r.tipo,'Descrição':r.descricao,'Fornecedor':r.fornecedor,'Custo':r.custo,'Km':r.km,'Observações':r.obs})));
