@@ -215,6 +215,24 @@ td.svc{min-width:240px}
   #print img{height:9mm;max-width:40mm;display:block}
   #print .ph{display:flex;gap:24px;margin:6px 0 12px}
   @page{size:A4 landscape;margin:12mm}
+  :root{--paper:#fff;--surface:#fff;--ink:#000;--muted:#555;--line:#ccc;--hydra:#3B4FB0;--hydra-ink:#fff;--hydra-soft:#E7EAF8}
+  #print *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-res h1{font:600 17pt var(--fc)}
+  .pr-res h3{font:600 12pt var(--fc);margin:0}
+  .pr-res section{margin:0 0 5mm}
+  .pr-kpi{display:flex;border:1px solid #ccc;border-radius:3mm;margin:0 0 5mm}
+  .pr-kpi div{flex:1;padding:2.5mm 3mm;border-left:1px solid #ccc}.pr-kpi div:first-child{border-left:0}
+  .pr-kpi b{display:block;font:600 14pt var(--fc)}.pr-kpi span{font-size:8.5pt;color:#555}
+  .pr-res .charts{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .pr-res .card{border:1px solid #ccc;border-radius:3mm;break-inside:avoid;background:#fff}
+  .pr-res .chart{padding:3mm 4mm}.pr-res .chart>p{margin:0 0 3mm;font-size:8.5pt}
+  .pr-res .ch-cols{height:42mm}.pr-res .ch-x,.pr-res .ch-axis,.pr-res .ch-cap{font-size:7pt}
+  .pr-res .ch-lbl,.pr-res .ch-track b{font-size:8pt}.pr-res .ch-track i{height:3mm}
+  .pr-res .scroll{overflow:visible}.pr-res table{min-width:0!important;font-size:8.5pt}
+  .pr-res section:has(table){break-inside:avoid}
+  .pr-res .bar-cell i{opacity:1}
+  .pr-res .zero{color:#bbb}
+  .pr-foot{font-size:8.5pt;color:#555;margin-top:4mm}
 }
 </style>
 </head>
@@ -687,7 +705,7 @@ V.resumo=()=>{
  const cats=[...new Set([...S.config.categorias,...vs.map(v=>v.categoria)])].filter(Boolean);
  const cm=cats.map(c=>({c,m:MESES.map((_,i)=>vs.filter(v=>v.categoria===c&&v.dataSaida.slice(5,7)===pad(i+1)).length)})).filter(r=>r.m.some(Boolean));
  const cond=nomesCond().map(n=>({n,s:vs.filter(v=>v.condutor===n).length,km:sum(vs.filter(v=>v.condutor===n),kmFeitos)})).filter(x=>x.s);
- return `<div class="head"><h2>Resumo anual</h2><select class="btn" data-act="ano-res" aria-label="Ano">${anos().map(a=>`<option${a===y?' selected':''}>${a}</option>`).join('')}</select></div>
+ return `<div class="head"><h2>Resumo anual</h2><div class="row"><select class="btn" data-act="ano-res" aria-label="Ano">${anos().map(a=>`<option${a===y?' selected':''}>${a}</option>`).join('')}</select><button class="btn" data-act="print-resumo">Imprimir / guardar PDF</button></div></div>
  <section class="charts">
   <div class="card chart"><h3>Km percorridos por mês</h3><p class="muted">Total: ${fmtN(sum(m,x=>x.km))} km</p>${colunas(m.map((x,i)=>({l:MES3[i],tip:x.n,v:x.km})),v=>fmtN(v)+' km',eixoNum)}</div>
   <div class="card chart"><h3>Saídas por mês</h3><p class="muted">Total: ${sum(m,x=>x.s)} saídas</p>${colunas(m.map((x,i)=>({l:MES3[i],tip:x.n,v:x.s})),v=>v+(v===1?' saída':' saídas'),eixoNum)}</div>
@@ -729,7 +747,23 @@ V.definicoes=()=>{const c=S.config,fb=fbGuardado();
 };
 
 /* ---------- Impressão ---------- */
-function imprimirDiario(){
+function paginaImpressao(sz){let s=$('#pgsize');if(!s){s=document.createElement('style');s.id='pgsize';document.head.appendChild(s)}s.textContent=`@media print{@page{size:${sz};margin:12mm}}`}
+function imprimirResumo(){
+ const v=S.config.viatura,box=document.createElement('div');box.innerHTML=V.resumo();box.querySelector('.head')?.remove();
+ box.querySelectorAll('[tabindex]').forEach(e=>e.removeAttribute('tabindex'));
+ const y=anoRes,vs=S.viagens.filter(x=>(x.dataSaida||'').startsWith(y)),as=S.abastecimentos.filter(a=>(a.data||'').startsWith(y));
+ $('#print').innerHTML=`<div class="pr-res"><h1>Resumo anual ${esc(y)} — Diário de viatura</h1>
+  <div class="ph"><span>Marca: <b>${esc(v.marca)}</b></span><span>Modelo: <b>${esc(v.modelo)}</b></span><span>Matrícula: <b>${esc(fmtMat(v.matricula))}</b></span></div>
+  <div class="pr-kpi"><div><b>${vs.length}</b><span>saídas</span></div><div><b>${fmtN(sum(vs,kmFeitos))} km</b><span>percorridos</span></div>
+   <div><b>${fmtDur(sum(vs,minutos))}</b><span>em serviço</span></div><div><b>${fmtN(sum(as,a=>a.litros),1)} L</b><span>combustível</span></div><div><b>${eur(sum(as,a=>a.valor))}</b><span>pago em combustível</span></div></div>
+  ${box.innerHTML}
+  <p class="pr-foot">Impresso a ${fmtD(hoje())}</p></div>`;
+ paginaImpressao('A4 portrait');
+ const titulo=document.title;document.title=`Resumo_anual_${y}_${(v.matricula||'').replace(/\W/g,'')}`;
+ const fim=()=>{document.title=titulo;window.removeEventListener('afterprint',fim)};window.addEventListener('afterprint',fim);
+ setTimeout(()=>window.print(),50);
+}
+function imprimirDiario(){paginaImpressao('A4 landscape');
  const rows=filtrarViagens().sort((a,b)=>kV(a).localeCompare(kV(b))),v=S.config.viatura;
  const per=[F.mes?MESES[+F.mes-1]:'',F.ano||'Todos os anos'].filter(Boolean).join(' de ')+(F.condutor?`, ${F.condutor}`:'')+(F.categoria?`, ${F.categoria}`:'');
  $('#print').innerHTML=`<h1>Registo diário de viatura</h1><div class="ph"><span>Marca: <b>${esc(v.marca)}</b></span><span>Modelo: <b>${esc(v.modelo)}</b></span><span>Matrícula: <b>${esc(fmtMat(v.matricula))}</b></span><span>Período: <b>${esc(per)}</b></span></div>
@@ -843,6 +877,7 @@ document.addEventListener('click',e=>{
  else if(a==='entrada')abrirForm('viagens',b.dataset.id,{dataEntrada:hoje(),horaEntrada:agora()});
  else if(a==='sub'){subMan=b.dataset.sub;render()}
  else if(a==='print-diario')imprimirDiario();
+ else if(a==='print-resumo')imprimirResumo();
  else if(a==='exp-json')descarregar(nomeBase()+'.json',JSON.stringify(S,null,1),'application/json');
  else if(a==='imp-json')$('#fileIn').click();
  else if(a==='exp-xlsx')exportXlsx();
