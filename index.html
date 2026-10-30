@@ -116,6 +116,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--line);border-bottom:0}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .filters select,.filters input{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-height:40px}
 .filters input{flex:1;min-width:180px}
+.filters .btn{min-height:40px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
 .seg button{border:0;background:var(--surface);padding:9px 14px;cursor:pointer;font-weight:500;color:var(--muted)}
 .seg button[aria-pressed=true]{background:var(--hydra);color:var(--hydra-ink)}
@@ -233,6 +234,26 @@ td.svc{min-width:240px}
   .pr-res .bar-cell i{opacity:1}
   .pr-res .zero{color:#bbb}
   .pr-foot{font-size:8.5pt;color:#555;margin-top:4mm}
+  .pr-filt{font-size:9pt;margin:0 0 4mm;padding:2mm 3mm;background:#f2f2f2;border-radius:2mm}
+  .pr-res .head{display:flex;justify-content:space-between;margin:0 0 2mm}.pr-res h2{font:600 13pt var(--fc);margin:0}
+  .pr-res td,.pr-res th{padding:3px 5px}.pr-res td.svc{min-width:0}
+  .pr-res .sig-img{height:8mm;max-width:30mm;padding:0}
+  .pr-res .sub{font-size:7.5pt}
+  .pr-res .b{border:1px solid #bbb}
+  .pr-res .budget,.pr-res .segs{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin-bottom:4mm}.pr-res .segs{grid-template-columns:1fr 1fr}
+  .pr-res .budget .card,.pr-res .segc{padding:3mm 4mm}
+  .pr-res .hero{display:flex;justify-content:space-between;border:1px solid #ccc;border-radius:3mm;padding:4mm;margin-bottom:4mm}
+  .pr-res .odo span{font-size:24pt}
+  .pr-res .alerts{display:grid;gap:2mm;margin-bottom:4mm}.pr-res .al{padding:2mm 3mm}
+  .pr-res .stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #ccc;border-radius:3mm}.pr-res .stat{padding:2.5mm 3mm}
+  .pr-res .stat b{font-size:15pt}
+  .pr-res .charts{margin-bottom:4mm}
+  .pr-res tr{break-inside:avoid}
+  .pr-res .nw{white-space:normal}
+  .pr-res .card.scroll{border:0;border-radius:0}
+  .pr-res table{width:100%;table-layout:auto}
+  .pr-res table:has(th:nth-child(12)){font-size:7.6pt}
+  .pr-res table:has(th:nth-child(12)) td,.pr-res table:has(th:nth-child(12)) th{padding:2px 3px}
 }
 </style>
 </head>
@@ -510,7 +531,7 @@ function remover(tipo,id){S[tipo]=S[tipo].filter(x=>x.id!==id);saveLocal();fbDel
 
 /* ---------- Tabelas ---------- */
 function tabela(tipo,rows,cols,foot){
- if(!rows.length)return `<div class="card empty">Ainda não há registos. Use o botão acima para adicionar o primeiro.</div>`;
+ if(!rows.length)return `<div class="card empty">${(S[tipo]||[]).length?'Nenhum registo corresponde à pesquisa ou aos filtros escolhidos.':'Ainda não há registos. Use o botão acima para adicionar o primeiro.'}</div>`;
  return `<div class="card scroll"><table><thead><tr>${cols.map(c=>`<th class="${c.c||''}">${c.l}</th>`).join('')}</tr></thead>
  <tbody>${rows.map(r=>`<tr data-id="${r.id}" data-tipo="${tipo}" tabindex="0">${cols.map(c=>`<td class="${c.c||''}">${c.v(r)}</td>`).join('')}</tr>`).join('')}</tbody>
  ${foot?`<tfoot><tr>${foot.map(f=>`<td class="${f.c||''}"${f.span?` colspan="${f.span}"`:''}>${f.v}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
@@ -567,7 +588,7 @@ V.inicio=()=>{
    <button class="btn" data-act="novo" data-tipo="abastecimentos">Registar abastecimento</button>
    <button class="btn" data-act="novo" data-tipo="inspecoes">Registar inspeção mensal</button></div></section>
  ${al.length?`<section class="alerts">${al.map(a=>`<div class="al ${a.n}">${a.t}</div>`).join('')}</section>`:''}
- <section><h2>Em ${y}</h2><div class="stats">
+ <section><div class="head"><h2>Em ${y}</h2>${btnPrint}</div><div class="stats">
   <div class="stat"><b>${vy.length}</b><span>saídas</span></div>
   <div class="stat"><b>${fmtN(sum(vy,kmFeitos))}</b><span>km percorridos</span></div>
   <div class="stat"><b>${fmtN(sum(ay,a=>a.litros),1)} L</b><span>combustível, ${eur(sum(ay,a=>a.valor))}</span></div>
@@ -588,25 +609,62 @@ function colsViagens(curto){
   {l:'Condutor',c:'nw',v:v=>esc(v.condutor)},{l:'Rubrica',c:'sigc',v:v=>sigCel('viagens',v)});
  return c;
 }
-function filtrarViagens(){const q=F.q.toLowerCase();return S.viagens.filter(v=>(!F.ano||(v.dataSaida||'').startsWith(F.ano))&&(!F.mes||(v.dataSaida||'').slice(5,7)===F.mes)&&(!F.condutor||v.condutor===F.condutor)&&(!F.categoria||v.categoria===F.categoria)&&(!q||`${v.servico} ${v.obs} ${v.condutor}`.toLowerCase().includes(q)))}
+function filtrarViagens(){const q=F.q.toLowerCase();return S.viagens.filter(v=>(!q||txtMatch(v,q))&&(!F.ano||(v.dataSaida||'').startsWith(F.ano))&&(!F.mes||(v.dataSaida||'').slice(5,7)===F.mes)&&(!F.condutor||v.condutor===F.condutor)&&(!F.categoria||v.categoria===F.categoria))}
 V.diario=()=>{
  const rows=filtrarViagens().sort((a,b)=>kV(b).localeCompare(kV(a))),ab=viagemAberta();
- const sel=(k,opts,todos)=>`<select data-filter="${k}" aria-label="${todos}"><option value="">${todos}</option>${opts.map(o=>`<option value="${esc(o[0])}"${F[k]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+ const LB={ano:'Ano',mes:'Mês',condutor:'Condutor',categoria:'Categoria'};
+ const sel=(k,opts,todos)=>`<select data-filter="${k}" data-lbl="${LB[k]}" aria-label="${LB[k]}"><option value="">${todos}</option>${opts.map(o=>`<option value="${esc(o[0])}"${F[k]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
  return `<div class="head"><h2>Registo diário</h2><div class="row">
-  <button class="btn" data-act="print-diario">Imprimir</button>
+  <button class="btn" data-act="print-diario">Imprimir / PDF</button>
   ${ab?`<button class="btn primary" data-act="entrada" data-id="${ab.id}">Registar entrada</button>`:`<button class="btn primary" data-act="novo" data-tipo="viagens">Registar saída</button>`}</div></div>
  <div class="filters">${sel('ano',anos().map(a=>[a,a]),'Todos os anos')}${sel('mes',MESES.map((m,i)=>[pad(i+1),m]),'Todos os meses')}
   ${sel('condutor',nomesCond().map(n=>[n,n]),'Todos os condutores')}${sel('categoria',S.config.categorias.map(n=>[n,n]),'Todas as categorias')}
-  <input type="search" data-filter="q" placeholder="Procurar no serviço ou observações" value="${esc(F.q)}"></div>
+  <input type="search" data-filter="q" placeholder="Pesquisar serviço, observações…" value="${esc(F.q)}" aria-label="Pesquisar">
+  ${Object.values(F).some(Boolean)?'<button class="btn" data-act="limpar-f" data-key="viagens">Limpar filtros</button>':''}</div>
  ${tabela('viagens',rows,colsViagens(false),[{v:`${rows.length} ${rows.length===1?'saída':'saídas'}`,span:3},{v:fmtDur(sum(rows,minutos)),c:'num'},{v:'',span:2},{v:fmtN(sum(rows,kmFeitos))+' km',c:'num'},{v:'',span:3}])}`;
 };
 
+/* ---------- Filtros e pesquisa ---------- */
+const Y0=String(new Date().getFullYear());
+const FT={abastecimentos:{ano:Y0,mes:'',pagamento:'',condutor:'',q:''},inspecoes:{ano:'',mes:'',estado:'',q:''},
+ manutencoes:{ano:'',mes:'',tipo:'',q:''},pneus:{ano:'',mes:'',q:''},regeneracoes:{ano:'',mes:'',resultado:'',q:''},
+ acidentes:{ano:'',mes:'',condutor:'',participacao:'',q:''},seguros:{objeto:'',estado:'',q:''},condutores:{estado:'',reboque:'',q:''}};
+const txtMatch=(r,q)=>{if(!q)return true;q=q.toLowerCase();return Object.entries(r).some(([k,x])=>{if(k==='rubrica'||k==='id'||x==null||typeof x==='object')return false;const s=String(x).toLowerCase();return s.includes(q)||(/^\d{4}-\d{2}-\d{2}$/.test(s)&&fmtD(s).includes(q))})};
+const dataMatch=(d,f)=>(!f.ano||(d||'').startsWith(f.ano))&&(!f.mes||(d||'').slice(5,7)===f.mes);
+const unicos=arr=>[...new Set(arr.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt')).map(x=>[x,x]);
+function barraFiltros(key,extra=[],ph='Pesquisar'){
+ const f=FT[key];
+ const sel=(k,lbl,opts,todos)=>`<select data-ff="${key}.${k}" data-lbl="${lbl}" aria-label="${lbl}"><option value="">${todos}</option>${opts.map(o=>`<option value="${esc(o[0])}"${f[k]===String(o[0])?' selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+ let h='';
+ if('ano' in f)h+=sel('ano','Ano',anos().map(a=>[a,a]),'Todos os anos');
+ if('mes' in f)h+=sel('mes','Mês',MESES.map((m,i)=>[pad(i+1),m]),'Todos os meses');
+ extra.forEach(e=>h+=sel(e.k,e.lbl,e.opts,e.todos));
+ return `<div class="filters">${h}<input type="search" data-ffq="${key}" placeholder="${esc(ph)}" value="${esc(f.q)}" aria-label="Pesquisar">
+  ${Object.values(f).some(Boolean)?`<button class="btn" data-act="limpar-f" data-key="${key}">Limpar filtros</button>`:''}</div>`;
+}
+const btnPrint='<button class="btn" data-act="print-vista">Imprimir / PDF</button>';
+
 V.abastecimentos=()=>{
- const c=S.config,l=abastCalc().reverse(),ys=Object.keys(c.orcamento||{}).sort();
- return `<div class="head"><h2>Abastecimentos</h2><button class="btn primary" data-act="novo" data-tipo="abastecimentos">Registar abastecimento</button></div>
+ const c=S.config,f=FT.abastecimentos,ys=Object.keys(c.orcamento||{}).sort();
+ const l=abastCalc().reverse().filter(a=>dataMatch(a.data,f)&&(!f.pagamento||a.pagamento===f.pagamento)&&(!f.condutor||a.condutor===f.condutor)&&txtMatch(a,f.q));
+ const asc=[...l].reverse();
+ const per=f.ano?MESES.map((n,i)=>{const x=l.filter(a=>a.data.startsWith(`${f.ano}-${pad(i+1)}`));return{l:MES3[i],tip:`${n} ${f.ano}`,lt:r2(sum(x,a=>a.litros)),e:r2(sum(x,a=>a.valor))}})
+  :[...new Set(l.map(a=>a.data.slice(0,4)))].sort().map(y=>{const x=l.filter(a=>a.data.startsWith(y));return{l:y,tip:y,lt:r2(sum(x,a=>a.litros)),e:r2(sum(x,a=>a.valor))}});
+ const pp=f.ano?'por mês':'por ano';
+ const cs=asc.filter(a=>a.consumo),cMed=sum(cs,a=>a.kmDesde)?sum(cs,a=>a.litros)/sum(cs,a=>a.kmDesde)*100:0;
+ const pags=[...new Set(l.map(a=>a.pagamento||'Sem indicação'))].map(p=>{const x=l.filter(a=>(a.pagamento||'Sem indicação')===p);return{l:p,v:r2(sum(x,a=>a.valor)),extra:fmtN(sum(x,a=>a.litros),1)+' L, '+x.length+(x.length===1?' abastecimento':' abastecimentos')}}).sort((a,b)=>b.v-a.v);
+ return `<div class="head"><h2>Abastecimentos</h2><div class="row">${btnPrint}<button class="btn primary" data-act="novo" data-tipo="abastecimentos">Registar abastecimento</button></div></div>
  ${ys.length?`<div class="budget">${ys.map(y=>{const g=galp(y);return `<div class="card"><span class="muted">Previsão autorizada ${esc(c.pagamentoOrcamento)} ${y}</span><br>
   <b>${eur(g.rest)}</b> <span class="muted">restantes de ${eur(g.prev)}</span>
   <div class="meter"><i class="${g.pct>=1?'bad':g.pct>=.85?'warn':''}" style="width:${Math.min(100,g.pct*100)}%"></i></div></div>`}).join('')}</div>`:''}
+ ${barraFiltros('abastecimentos',[{k:'pagamento',lbl:'Pagamento',todos:'Todos os pagamentos',opts:unicos([...c.pagamentos,...S.abastecimentos.map(a=>a.pagamento)])},
+   {k:'condutor',lbl:'Condutor',todos:'Todos os condutores',opts:unicos(S.abastecimentos.map(a=>a.condutor))}],'Pesquisar fatura, observações…')}
+ <section class="charts">
+  <div class="card chart"><h3>Litros abastecidos ${pp}</h3><p class="muted">Total: ${fmtN(sum(l,a=>a.litros),2)} L</p>${colunas(per.map(x=>({l:x.l,tip:x.tip,v:x.lt})),v=>fmtN(v,1)+' L',eixoNum)}</div>
+  <div class="card chart"><h3>Valor pago ${pp}</h3><p class="muted">Total: ${eur(sum(l,a=>a.valor))}</p>${colunas(per.map(x=>({l:x.l,tip:x.tip,v:x.e})),v=>eur(v),v=>fmtN(v,0)+' €')}</div>
+  <div class="card chart"><h3>Consumo estimado por abastecimento</h3><p class="muted">${cs.length?`Média: ${fmtN(cMed,1)} L/100 km`:'Precisa de pelo menos dois abastecimentos'}</p>${colunas(cs.map(a=>({l:fmtD(a.data).slice(0,5),tip:fmtD(a.data),v:Math.round(a.consumo*10)/10})),v=>fmtN(v,1)+' L/100 km',v=>fmtN(v,0))}</div>
+  <div class="card chart"><h3>Valor pago por forma de pagamento</h3><p class="muted">${l.length} ${l.length===1?'abastecimento':'abastecimentos'}</p>${barras(pags,v=>eur(v))}</div>
+ </section>
  ${tabela('abastecimentos',l,[
   {l:'Data',c:'nw',v:a=>fmtD(a.data)},{l:'Km',c:'num',v:a=>fmtN(a.km)},{l:'Litros',c:'num',v:a=>fmtN(a.litros,2)},
   {l:'Preço c/desc. s/IVA',c:'num',v:a=>{const c=calcIVA(a);return c&&!c.legado?`${fmtN(c.pcd,4)} €<span class="sub">${fmtN(a.precoSemIva,4)} − ${fmtN(a.descUnit||0,4)} desc.</span>`:'—'}},
@@ -616,37 +674,50 @@ V.abastecimentos=()=>{
   {l:'Desde o anterior',c:'num',v:a=>a.kmDesde!=null?`${fmtN(a.kmDesde)} km<span class="sub">${a.difDias} dias</span>`:'—'},
   {l:'Consumo estimado',c:'num',v:a=>a.consumo?fmtN(a.consumo,1)+' L/100':'—'},
   {l:'Fatura',c:'nw',v:a=>esc(a.fatura)},{l:'Pagamento',c:'nw',v:a=>esc(a.pagamento)},{l:'Condutor',c:'nw',v:a=>esc(a.condutor)},{l:'Rubrica',c:'sigc',v:a=>sigCel('abastecimentos',a)}],
-  [{v:`${l.length} abastecimentos`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:''},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.base:0})),c:'num'},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.iva:0})),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:7}])}
+  [{v:`${l.length} ${l.length===1?'abastecimento':'abastecimentos'}`,span:2},{v:fmtN(sum(l,a=>a.litros),2),c:'num'},{v:''},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.base:0})),c:'num'},{v:eur(sum(l,a=>{const c=calcIVA(a);return c&&!c.legado?c.iva:0})),c:'num'},{v:eur(sum(l,a=>a.valor)),c:'num'},{v:'',span:7}])}
  <p class="muted" style="font-size:.88rem">O consumo estimado divide os litros de cada abastecimento pelos km feitos desde o anterior — é fiável quando se atesta sempre o depósito.</p>`;
 };
 
+const INSP_K=['pneus','luzes','travoes','oleo','liquidos','extintor'];
+const temNC=r=>INSP_K.some(k=>r[k]==='Não conforme');
 V.inspecoes=()=>{
- const l=[...S.inspecoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
- return `<div class="head"><h2>Inspeções mensais</h2><button class="btn primary" data-act="novo" data-tipo="inspecoes">Registar inspeção</button></div>
+ const f=FT.inspecoes;
+ const l=[...S.inspecoes].sort((a,b)=>kD(b).localeCompare(kD(a))).filter(r=>dataMatch(r.data,f)&&(!f.estado||(f.estado==='nc'?temNC(r):f.estado==='ok'?!temNC(r):!r.rubrica))&&txtMatch(r,f.q));
+ return `<div class="head"><h2>Inspeções mensais</h2><div class="row">${btnPrint}<button class="btn primary" data-act="novo" data-tipo="inspecoes">Registar inspeção</button></div></div>
+ ${barraFiltros('inspecoes',[{k:'estado',lbl:'Estado',todos:'Todos os estados',opts:[['nc','Com pontos não conformes'],['ok','Tudo conforme'],['nass','Por assinar']]}],'Pesquisar observações, seguimento…')}
  ${tabela('inspecoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},
-  ...['pneus','luzes','travoes','oleo','liquidos','extintor'].map(k=>({l:SC.inspecoes.campos.find(f=>f.k===k).l,v:r=>estadoB(r[k])})),
+  ...INSP_K.map(k=>({l:SC.inspecoes.campos.find(f=>f.k===k).l,v:r=>estadoB(r[k])})),
   {l:'Diversos e observações',v:r=>[r.diversos,r.observacoes].filter(Boolean).map(esc).join('<br>')+(r.seguimento?`<span class="sub">Seguimento: ${nl(r.seguimento)}</span>`:'')},
-  {l:'Verificado por',c:'nw',v:r=>esc(r.assinatura)||'—'},{l:'Assinatura',c:'sigc',v:r=>sigCel('inspecoes',r)}])}`;
+  {l:'Verificado por',c:'nw',v:r=>esc(r.assinatura)||'—'},{l:'Assinatura',c:'sigc',v:r=>sigCel('inspecoes',r)}],
+  l.length?[{v:`${l.length} ${l.length===1?'inspeção':'inspeções'}`,span:10}]:null)}`;
 };
 
 V.manutencao=()=>{
  const segs=[['manutencoes','Manutenção e reparações'],['pneus','Pneus'],['regeneracoes','Regenerações DPF']];
- let body='';
- if(subMan==='manutencoes'){const l=[...S.manutencoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+ const f=FT[subMan];let body='',fil='';
+ if(subMan==='manutencoes'){
+  const l=[...S.manutencoes].sort((a,b)=>kD(b).localeCompare(kD(a))).filter(r=>dataMatch(r.data,f)&&(!f.tipo||r.tipo===f.tipo)&&txtMatch(r,f.q));
+  fil=barraFiltros('manutencoes',[{k:'tipo',lbl:'Tipo',todos:'Todos os tipos',opts:unicos(S.manutencoes.map(r=>r.tipo))}],'Pesquisar descrição, fornecedor…');
   body=tabela('manutencoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Tipo',v:r=>esc(r.tipo)},{l:'Descrição',v:r=>esc(r.descricao)+(r.obs?`<span class="sub">${esc(r.obs)}</span>`:'')},
    {l:'Fornecedor',v:r=>esc(r.fornecedor)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Custo',c:'num',v:r=>eur(r.custo)}],
-   [{v:`${l.length} registos`,span:5},{v:eur(sum(l,r=>r.custo)),c:'num'}])}
- else if(subMan==='pneus'){const a=[...S.pneus].sort((x,y)=>kD(x).localeCompare(kD(y)));const l=a.map((r,i)=>({...r,desde:i&&r.km!=null&&a[i-1].km!=null?r.km-a[i-1].km:null})).reverse();
+   [{v:`${l.length} ${l.length===1?'registo':'registos'}`,span:5},{v:eur(sum(l,r=>r.custo)),c:'num'}])}
+ else if(subMan==='pneus'){
+  const a=[...S.pneus].sort((x,y)=>kD(x).localeCompare(kD(y)));
+  const l=a.map((r,i)=>({...r,desde:i&&r.km!=null&&a[i-1].km!=null?r.km-a[i-1].km:null})).reverse().filter(r=>dataMatch(r.data,f)&&txtMatch(r,f.q));
+  fil=barraFiltros('pneus',[],'Pesquisar oficina, observações…');
   body=tabela('pneus',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Km desde a troca anterior',c:'num',v:r=>fmtN(r.desde)},
    {l:'Oficina',v:r=>esc(r.oficina)},{l:'Observações',v:r=>esc(r.observacoes)},{l:'Nome',c:'nw',v:r=>esc(r.condutor)},{l:'Rubrica',c:'sigc',v:r=>sigCel('pneus',r)}])+
    (a.length?`<p class="muted">Desde a última troca: <b>${fmtN(kmAtual()-a[a.length-1].km)} km</b>.</p>`:'')}
- else{const l=[...S.regeneracoes].sort((a,b)=>kD(b).localeCompare(kD(a)));
+ else{
+  const l=[...S.regeneracoes].sort((a,b)=>kD(b).localeCompare(kD(a))).filter(r=>dataMatch(r.data,f)&&(!f.resultado||r.resultado===f.resultado)&&txtMatch(r,f.q));
+  fil=barraFiltros('regeneracoes',[{k:'resultado',lbl:'Resultado',todos:'Todos os resultados',opts:[['Concluída','Concluída'],['Interrompida','Interrompida'],['Falhou','Falhou']]}],'Pesquisar observações…');
   body=tabela('regeneracoes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)},{l:'Km',c:'num',v:r=>fmtN(r.km)},{l:'Tipo',v:r=>esc(r.tipo)},
    {l:'Duração',c:'num',v:r=>r.duracao!=null?r.duracao+' min':'—'},{l:'Resultado',v:r=>r.resultado?`<span class="b ${r.resultado==='Concluída'?'ok':'warn'}">${esc(r.resultado)}</span>`:'—'},{l:'Observações',v:r=>esc(r.obs)}])}
- return `<div class="head"><h2>Manutenção</h2><button class="btn primary" data-act="novo" data-tipo="${subMan}">Registar ${SC[subMan].nome}</button></div>
- <div class="seg" role="group">${segs.map(s=>`<button data-act="sub" data-sub="${s[0]}" aria-pressed="${subMan===s[0]}">${s[1]}</button>`).join('')}</div>${body}`;
+ return `<div class="head"><h2>Manutenção</h2><div class="row">${btnPrint}<button class="btn primary" data-act="novo" data-tipo="${subMan}">Registar ${SC[subMan].nome}</button></div></div>
+ <div class="seg" role="group">${segs.map(s=>`<button data-act="sub" data-sub="${s[0]}" aria-pressed="${subMan===s[0]}">${s[1]}</button>`).join('')}</div>${fil}${body}`;
 };
 
+const estadoSegCod=r=>{if(!r.fim)return '';if(r.fim<hoje())return 'expirado';const e=estadoSeg(r);return e.c==='warn'?'termina':e.c==='ok'?'vigor':'futuro'};
 V.seguros=()=>{
  const cart=o=>{const s=segAtual(o),e=estadoSeg(s);
   return `<div class="card segc"><div class="segh"><h3>${OBJ_SEG[o]}</h3><span class="b ${e.c}">${e.t}</span></div>
@@ -656,42 +727,80 @@ V.seguros=()=>{
    <div><dt>Alerta a partir de</dt><dd>${fmtD(menosUmMes(s.fim))}</dd></div></dl>
    <div class="row"><button class="btn primary" data-act="renovar-seg" data-id="${s.id}">Registar renovação</button><button class="btn" data-act="edit" data-tipo="seguros" data-id="${s.id}">Editar</button></div>`
   :`<p class="muted">Registe a matrícula, o número da apólice e a validade.</p><button class="btn primary" data-act="novo-seg" data-obj="${o}">Adicionar seguro</button>`}</div>`};
- const l=[...S.seguros].sort((a,b)=>(b.fim||'').localeCompare(a.fim||''));
- return `<div class="head"><h2>Seguros</h2><button class="btn" data-act="novo" data-tipo="seguros">Adicionar apólice</button></div>
+ const f=FT.seguros;
+ const l=[...S.seguros].sort((a,b)=>(b.fim||'').localeCompare(a.fim||'')).filter(r=>(!f.objeto||r.objeto===f.objeto)&&(!f.estado||estadoSegCod(r)===f.estado)&&txtMatch({...r,objeto:OBJ_SEG[r.objeto]},f.q));
+ return `<div class="head"><h2>Seguros</h2><div class="row">${btnPrint}<button class="btn" data-act="novo" data-tipo="seguros">Adicionar apólice</button></div></div>
  <div class="segs">${cart('viatura')}${cart('atrelado')}</div>
  <p class="muted" style="font-size:.88rem">O alerta aparece na página inicial um mês antes da data de fim de cada apólice.</p>
  <h3 style="margin:18px 0 8px">Histórico de apólices</h3>
+ ${barraFiltros('seguros',[{k:'objeto',lbl:'Seguro de',todos:'Viatura e atrelado',opts:Object.entries(OBJ_SEG)},
+   {k:'estado',lbl:'Estado',todos:'Todos os estados',opts:[['vigor','Em vigor'],['termina','A terminar (último mês)'],['expirado','Expirado'],['futuro','Ainda não iniciado']]}],'Pesquisar apólice, matrícula, seguradora…')}
  ${tabela('seguros',l,[{l:'Seguro de',v:r=>esc(OBJ_SEG[r.objeto]||r.objeto)},{l:'Matrícula',c:'nw',v:r=>esc(fmtMat(r.matricula))},{l:'Apólice',c:'nw',v:r=>esc(r.apolice)},
   {l:'Seguradora',v:r=>esc(r.seguradora)},{l:'Início',c:'nw',v:r=>fmtD(r.inicio)},{l:'Fim',c:'nw',v:r=>fmtD(r.fim)},{l:'Prémio',c:'num',v:r=>r.premio!=null?eur(r.premio):'—'},
   {l:'Estado',c:'nw',v:r=>{const e=estadoSeg(r);return `<span class="b ${e.c}">${r.fim<hoje()?'Expirado':e.t}</span>`}}])}`;
 };
-V.acidentes=()=>{const l=[...S.acidentes].sort((a,b)=>kD(b).localeCompare(kD(a)));
- return `<div class="head"><h2>Registo de acidentes</h2><button class="btn primary" data-act="novo" data-tipo="acidentes">Registar acidente</button></div>
+
+V.acidentes=()=>{
+ const f=FT.acidentes;
+ const l=[...S.acidentes].sort((a,b)=>kD(b).localeCompare(kD(a))).filter(r=>dataMatch(r.data,f)&&(!f.condutor||r.condutor===f.condutor)&&(!f.participacao||r.participacao===f.participacao)&&txtMatch(r,f.q));
+ return `<div class="head"><h2>Registo de acidentes</h2><div class="row">${btnPrint}<button class="btn primary" data-act="novo" data-tipo="acidentes">Registar acidente</button></div></div>
+ ${barraFiltros('acidentes',[{k:'condutor',lbl:'Condutor',todos:'Todos os condutores',opts:unicos(S.acidentes.map(r=>r.condutor))},
+   {k:'participacao',lbl:'Participação',todos:'Com e sem participação',opts:[['Sim','Com participação'],['Não','Sem participação']]}],'Pesquisar local, descrição, danos…')}
  ${tabela('acidentes',l,[{l:'Data',c:'nw',v:r=>fmtD(r.data)+(r.hora?`<span class="sub">${r.hora}</span>`:'')},{l:'Local',v:r=>esc(r.local)},{l:'Condutor',v:r=>esc(r.condutor)},
   {l:'Descrição',v:r=>esc(r.descricao)},{l:'Danos',v:r=>esc(r.danos)},{l:'Entidades',v:r=>esc(r.entidades)},{l:'Participação',v:r=>esc(r.participacao)}])}`};
 
-V.condutores=()=>{const h=hoje(),a=S.config.cartaAvisoDias,l=[...S.condutores].sort((x,y)=>x.nome.localeCompare(y.nome,'pt'));
- return `<div class="head"><h2>Condutores autorizados</h2><button class="btn primary" data-act="novo" data-tipo="condutores">Adicionar condutor</button></div>
+const estadoCarta=r=>{if(!r.validade)return 'sem';const d=dias(hoje(),r.validade);return d<0?'expirada':d<=S.config.cartaAvisoDias?'expirar':'valida'};
+V.condutores=()=>{
+ const h=hoje(),a=S.config.cartaAvisoDias,f=FT.condutores;
+ const l=[...S.condutores].sort((x,y)=>x.nome.localeCompare(y.nome,'pt')).filter(r=>(!f.estado||estadoCarta(r)===f.estado)&&(!f.reboque||(r.reboque||'Não')===f.reboque)&&txtMatch(r,f.q));
+ return `<div class="head"><h2>Condutores autorizados</h2><div class="row">${btnPrint}<button class="btn primary" data-act="novo" data-tipo="condutores">Adicionar condutor</button></div></div>
+ ${barraFiltros('condutores',[{k:'estado',lbl:'Carta',todos:'Todas as cartas',opts:[['valida','Carta válida'],['expirar','A expirar'],['expirada','Expirada'],['sem','Validade por preencher']]},
+   {k:'reboque',lbl:'Reboque',todos:'Com e sem reboque',opts:[['Sim','Habilitado para reboque'],['Não','Sem reboque']]}],'Pesquisar nome, carta, despacho…')}
  ${tabela('condutores',l,[{l:'Nome',v:r=>`<b>${esc(r.nome)}</b>`},{l:'Carta de condução',v:r=>esc(r.carta)||'—'},
   {l:'Validade',c:'nw',v:r=>{if(!r.validade)return '<span class="b mut">Por preencher</span>';const d=dias(h,r.validade);return `${fmtD(r.validade)} ${d<0?'<span class="b bad">Expirada</span>':d<=a?'<span class="b warn">A expirar</span>':''}`}},
   {l:'Despacho',v:r=>esc(r.despacho)||'—'},{l:'Reboque',v:r=>esc(r.reboque)||'—'},
   {l:'Saídas',c:'num',v:r=>S.viagens.filter(v=>v.condutor===r.nome).length},{l:'Km conduzidos',c:'num',v:r=>fmtN(sum(S.viagens.filter(v=>v.condutor===r.nome),kmFeitos))}])}`};
 
+/* ---------- Impressão genérica ---------- */
+const ORIENT={inicio:'A4 portrait',seguros:'A4 portrait',condutores:'A4 portrait'};
+function imprimirVista(){
+ const view=$('#view'),v=S.config.viatura;
+ const filtros=[...view.querySelectorAll('.filters select')].filter(s=>s.value).map(s=>`${s.dataset.lbl||''}: ${s.options[s.selectedIndex].text}`);
+ const q=view.querySelector('.filters input[type=search]')?.value.trim();if(q)filtros.push(`Pesquisa: «${q}»`);
+ const nomeTab=TABS.find(t=>t[0]===tab)[1];
+ let titulo=tab==='inicio'?'Ponto de situação':(view.querySelector(':scope>.head h2')?.textContent||nomeTab);
+ if(tab==='manutencao')titulo+=' — '+(view.querySelector('.seg [aria-pressed=true]')?.textContent||'');
+ const box=view.cloneNode(true);box.removeAttribute('id');
+ box.querySelectorAll(':scope>.head:first-child,.filters,.seg').forEach(e=>e.remove());
+ box.querySelectorAll('button').forEach(b=>b.dataset.act==='rubricar'?b.replaceWith(''):b.remove());
+ box.querySelectorAll('[tabindex],[id]').forEach(e=>{e.removeAttribute('tabindex');e.removeAttribute('id')});
+ const n=box.querySelectorAll('tbody tr').length;
+ $('#print').innerHTML=`<div class="pr-res"><h1>${esc(titulo)} — Diário de viatura</h1>
+  <div class="ph"><span>Marca: <b>${esc(v.marca)}</b></span><span>Modelo: <b>${esc(v.modelo)}</b></span><span>Matrícula: <b>${esc(fmtMat(v.matricula))}</b></span></div>
+  ${filtros.length?`<p class="pr-filt">Filtros aplicados: ${esc(filtros.join('; '))}</p>`:''}
+  ${box.innerHTML}<p class="pr-foot">Impresso a ${fmtD(hoje())} às ${agora()}</p></div>`;
+ paginaImpressao(ORIENT[tab]||'A4 landscape');
+ const t0=document.title;document.title=`${nomeTab.replace(/\W+/g,'_')}_${(v.matricula||'').replace(/\W/g,'')}_${hoje()}`;
+ const fim=()=>{document.title=t0;window.removeEventListener('afterprint',fim)};window.addEventListener('afterprint',fim);
+ setTimeout(()=>window.print(),50);
+}
+
+
 /* ---------- Gráficos ---------- */
 function niceMax(v){if(v<=0)return 1;const e=Math.pow(10,Math.floor(Math.log10(v))),f=v/e;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*e}
 function colunas(dados,fmt,fmtEixo){
- const mx=Math.max(...dados.map(d=>d.v)),top=niceMax(mx),ticks=[0,top/2,top];
- if(!mx)return '<div class="ch-empty">Sem dados neste ano.</div>';
+ const mx=Math.max(0,...dados.map(d=>d.v)),top=niceMax(mx),ticks=[0,top/2,top];
+ if(!mx)return '<div class="ch-empty">Sem dados para mostrar.</div>';
  const iMax=dados.findIndex(d=>d.v===mx);
  return `<div class="ch-cols" role="img" aria-label="${esc(dados.map(d=>d.l+': '+fmt(d.v)).join('; '))}">
   <div class="ch-axis">${ticks.slice().reverse().map(v=>`<span>${fmtEixo(v)}</span>`).join('')}</div>
   <div class="ch-plot"><div class="ch-gl">${ticks.map((v,i)=>`<i class="ch-grid${i?'':' base'}" style="bottom:${v/top*100}%"></i>`).join('')}</div>
    ${dados.map((d,i)=>`<div class="ch-col" data-tip="${esc(d.tip||d.l)}: ${esc(fmt(d.v))}" tabindex="0">
     <div class="ch-bar${d.v?'':' zero'}" style="height:${d.v/top*100}%">${i===iMax?`<b class="ch-cap">${esc(fmt(d.v))}</b>`:''}</div>
-    <span class="ch-x">${esc(d.l)}</span></div>`).join('')}</div></div>`;
+    <span class="ch-x">${i%Math.ceil(dados.length/12)===0?esc(d.l):''}</span></div>`).join('')}</div></div>`;
 }
 function barras(dados,fmt){
- const mx=Math.max(0,...dados.map(d=>d.v));if(!mx)return '<div class="ch-empty">Sem dados neste ano.</div>';
+ const mx=Math.max(0,...dados.map(d=>d.v));if(!mx)return '<div class="ch-empty">Sem dados para mostrar.</div>';
  return `<div class="ch-rows">${dados.map(d=>`<div class="ch-row" data-tip="${esc(d.l)}: ${esc(fmt(d.v))}${d.extra?' — '+esc(d.extra):''}" tabindex="0">
   <span class="ch-lbl">${esc(d.l)}</span><span class="ch-track"><i style="width:${Math.max(1.5,d.v/mx*100)}%"></i><b>${esc(fmt(d.v))}</b></span></div>`).join('')}</div>`;
 }
@@ -878,6 +987,8 @@ document.addEventListener('click',e=>{
  else if(a==='sub'){subMan=b.dataset.sub;render()}
  else if(a==='print-diario')imprimirDiario();
  else if(a==='print-resumo')imprimirResumo();
+ else if(a==='print-vista')imprimirVista();
+ else if(a==='limpar-f'){const k=b.dataset.key,o=k==='viagens'?F:FT[k];Object.keys(o).forEach(x=>o[x]='');render()}
  else if(a==='exp-json')descarregar(nomeBase()+'.json',JSON.stringify(S,null,1),'application/json');
  else if(a==='imp-json')$('#fileIn').click();
  else if(a==='exp-xlsx')exportXlsx();
@@ -893,8 +1004,10 @@ document.addEventListener('click',e=>{
  else if(a==='fb-off'){if(confirm('Desligar a sincronização neste equipamento? Os registos continuam guardados aqui.')){localStorage.setItem(LSFB,'"off"');location.reload()}}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest?.('tr[data-id]');if(tr)abrirForm(tr.dataset.tipo,tr.dataset.id)}});
-document.addEventListener('change',e=>{const f=e.target.dataset.filter;if(f&&f!=='q'){F[f]=e.target.value;render()}if(e.target.dataset.act==='ano-res'){anoRes=e.target.value;render()}});
-document.addEventListener('input',e=>{if(e.target.dataset.filter==='q'){F.q=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector('[data-filter=q]');i.focus();i.setSelectionRange(p,p)}});
+document.addEventListener('change',e=>{const ff=e.target.dataset.ff;if(ff){const[k,x]=ff.split('.');FT[k][x]=e.target.value;render();return}
+ const f=e.target.dataset.filter;if(f&&f!=='q'){F[f]=e.target.value;render()}if(e.target.dataset.act==='ano-res'){anoRes=e.target.value;render()}});
+document.addEventListener('input',e=>{const fq=e.target.dataset.ffq;if(fq){FT[fq].q=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector(`[data-ffq="${fq}"]`);if(i){i.focus();i.setSelectionRange(p,p)}return}
+ if(e.target.dataset.filter==='q'){F.q=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector('[data-filter=q]');i.focus();i.setSelectionRange(p,p)}});
 function guardarCfg(){
  const g=id=>$('#f_'+id).value,lin=s=>s.split('\n').map(x=>x.trim()).filter(Boolean),c=S.config;
  c.viatura={marca:g('marca').trim(),modelo:g('modelo').trim(),matricula:g('matricula').trim().toUpperCase()};
